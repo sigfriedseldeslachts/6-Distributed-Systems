@@ -8,10 +8,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class NamingServerApplication {
 
     public static void main(String[] args) {
-
-        System.out.println(new Node("test").hashCode());
-
-        //SpringApplication.run(NamingServerApplication.class, args);
+        SpringApplication.run(NamingServerApplication.class, args);
     }
 
 }

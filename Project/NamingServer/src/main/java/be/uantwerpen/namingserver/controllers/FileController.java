@@ -22,7 +22,11 @@ public class FileController {
             throw new IllegalArgumentException("Filename cannot be null");
         }
 
-        return nodeService.getNodeToStoreFileOn(filename);
+        Node node = nodeService.getNodeToStoreFileOn(filename);
+
+        System.out.println(node);
+
+        return node;
     }
 
 }

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 @Service
 public class NodeService {
@@ -21,6 +22,11 @@ public class NodeService {
     }
 
     public void addNode(Node node) {
+        // Check if a node with the same hash already exists
+        if (this.nodes.containsKey(node.hashCode())) {
+            throw new IllegalArgumentException("Node with the same hash already exists");
+        }
+
         nodes.put(node.hashCode(), node);
     }
 
@@ -51,11 +57,15 @@ public class NodeService {
         }
 
         // If we have no smallestDiffNode it will still equal MAX_VALUE
-        if (smallestDiffNode != Integer.MAX_VALUE) {
+        if (smallestDiffNode == Integer.MAX_VALUE) {
             return this.nodes.get(biggestNode);
         }
 
         return this.nodes.get(smallestDiffNode);
+    }
+
+    public List<Node> getAllNodes() {
+        return new ArrayList<>(this.nodes.values());
     }
 
 }
