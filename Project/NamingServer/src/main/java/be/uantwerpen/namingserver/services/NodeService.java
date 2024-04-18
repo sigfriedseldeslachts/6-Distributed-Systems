@@ -4,6 +4,7 @@ import be.uantwerpen.namingserver.models.Node;
 import be.uantwerpen.namingserver.utils.HashingFunction;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -66,6 +67,13 @@ public class NodeService {
 
     public List<Node> getAllNodes() {
         return new ArrayList<>(this.nodes.values());
+    }
+
+    public void updateLastPing(String name) {
+        Node node = this.getNode(name);
+        if (node == null) return;
+
+        node.setLastPing(LocalDateTime.now());
     }
 
 }

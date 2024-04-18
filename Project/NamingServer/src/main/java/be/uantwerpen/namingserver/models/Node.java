@@ -3,11 +3,15 @@ package be.uantwerpen.namingserver.models;
 import be.uantwerpen.namingserver.utils.HashingFunction;
 
 import java.net.InetAddress;
+import java.time.LocalDateTime;
 
 public class Node {
 
     private String name;
     private InetAddress address;
+    private LocalDateTime lastPing = null;
+
+    public Node() {}
 
     public Node(String name, InetAddress address) {
         this.name = name;
@@ -22,12 +26,20 @@ public class Node {
         this.address = address;
     }
 
+    public void setLastPing(LocalDateTime lastPing) {
+        this.lastPing = lastPing;
+    }
+
     public String getName() {
         return name;
     }
 
     public InetAddress getAddress() {
         return address;
+    }
+
+    public LocalDateTime getLastPing() {
+        return lastPing;
     }
 
     @Override
