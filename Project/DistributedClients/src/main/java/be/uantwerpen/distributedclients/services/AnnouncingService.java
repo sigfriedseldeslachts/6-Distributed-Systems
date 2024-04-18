@@ -25,7 +25,7 @@ public class AnnouncingService {
         this.socket = new MulticastSocket(6789);
         this.socket.joinGroup(new InetSocketAddress(address, 0), netIf);
 
-        Node node = new Node("test", InetAddress.getLoopbackAddress());
+        Node node = new Node(InetAddress.getLocalHost().getHostName(), InetAddress.getLoopbackAddress());
         setBufferUsingNode(node);
     }
 

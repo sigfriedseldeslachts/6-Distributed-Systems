@@ -9,6 +9,8 @@ public class Node {
     private String name;
     private InetAddress address;
 
+    public Node() {}
+
     public Node(String name, InetAddress address) {
         this.name = name;
         this.address = address;
