@@ -4,6 +4,10 @@ import be.uantwerpen.namingserver.models.Node;
 import be.uantwerpen.namingserver.utils.HashingFunction;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.File;
+import java.io.IOException;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,6 +17,8 @@ import java.util.List;
 public class NodeService {
 
     private final HashMap<Integer, Node> nodes = new HashMap<>();
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public Node getNode(String name) {
         return nodes.get(HashingFunction.getHashFromString(name));
@@ -29,6 +35,23 @@ public class NodeService {
         }
 
         nodes.put(node.hashCode(), node);
+
+        try {
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File("nodes.json"), nodes);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void deleteNode(Node node) {
+
+        nodes.remove(node.hashCode());
+
+        try {
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File("nodes.json"), nodes);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 

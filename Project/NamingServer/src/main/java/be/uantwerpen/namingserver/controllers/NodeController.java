@@ -27,4 +27,9 @@ public class NodeController {
         return node;
     }
 
+    @DeleteMapping("")
+    public void deleteNode(@RequestBody Node node) {
+        this.nodeService.deleteNode(node);
+    }
+
 }

@@ -1,6 +1,7 @@
 package be.uantwerpen.namingserver.models;
 
 import be.uantwerpen.namingserver.utils.HashingFunction;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.net.InetAddress;
 import java.time.LocalDateTime;
@@ -9,7 +10,8 @@ public class Node {
 
     private String name;
     private InetAddress address;
-    private LocalDateTime lastPing = null;
+    @JsonIgnore
+    private LocalDateTime lastPing;
 
     public Node() {}
 
