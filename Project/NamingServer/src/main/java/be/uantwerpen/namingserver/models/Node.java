@@ -4,12 +4,14 @@ import be.uantwerpen.namingserver.utils.HashingFunction;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.time.LocalDateTime;
 
 public class Node {
 
     private String name;
     private InetAddress address;
+    //private InetSocketAddress socketAddress;
     @JsonIgnore
     private LocalDateTime lastPing;
 

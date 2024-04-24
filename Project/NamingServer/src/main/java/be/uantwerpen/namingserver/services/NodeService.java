@@ -20,12 +20,16 @@ public class NodeService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public Node getNode(String name) {
-        return nodes.get(HashingFunction.getHashFromString(name));
+    public int getNumberOfNodes() {
+        return nodes.size();
     }
 
     public Node getNode(int hash) {
         return nodes.get(hash);
+    }
+
+    public Node getNode(String name) {
+        return getNode(HashingFunction.getHashFromString(name));
     }
 
     public void addNode(Node node) {
@@ -44,7 +48,6 @@ public class NodeService {
     }
 
     public void deleteNode(Node node) {
-
         nodes.remove(node.hashCode());
 
         try {
