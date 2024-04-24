@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 import java.net.*;
 
@@ -52,6 +53,7 @@ public class DiscoveryService {
             this.group = new InetSocketAddress(address, 0);
             this.netIf = NetworkInterface.getByName(interfaceName);
             this.nodeService = nodeService;
+
             this.logger.info("Done creating new DiscoveryListener thread.");
         }
 
@@ -88,6 +90,13 @@ public class DiscoveryService {
                         this.logger.info("Node already known: " + node.getName());
                         nodeService.updateLastPing(node.getName());
                     }
+
+                    // Send client request to new node
+                    RestClient client = RestClient.builder()
+                            .baseUrl("http://" + node.getAddress() + "/nodes/" + nodeService.getNumberOfNodes())
+                            .defaultHeader("Content-Type", "application/json")
+                            .build();
+                    client.post();
                 }
             } catch (Exception e) {
                 logger.error("Failed to listen for incoming messages: " + e.getMessage());
