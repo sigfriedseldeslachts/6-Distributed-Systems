@@ -96,7 +96,7 @@ public class DiscoveryService {
                             .baseUrl("http://" + node.getAddress() + "/nodes/" + nodeService.getNumberOfNodes())
                             .defaultHeader("Content-Type", "application/json")
                             .build();
-                    client.post();
+                    client.post().retrieve();
                 }
             } catch (Exception e) {
                 logger.error("Failed to listen for incoming messages: " + e.getMessage());

@@ -5,11 +5,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
 import java.net.*;
 
 import static be.uantwerpen.distributedclients.utils.HashingFunction.getHashFromString;
 
+@Service
 public class ReceiveMulticastOfNewNode {
     private final String interfaceName = "any";
 
@@ -18,13 +20,13 @@ public class ReceiveMulticastOfNewNode {
 
     private Thread listener;
 
-    public ReceiveMulticastOfNewNode() throws Exception {
+    public ReceiveMulticastOfNewNode(InfoService infoService) throws Exception {
 
         this.socket = new DatagramSocket();
         this.group = InetAddress.getByName("230.0.0.0");
 
         // Launch separate thread to listen for incoming messages
-        this.listener = new Thread(new DiscoveryListener(this.socket, this.group, this.interfaceName));
+        this.listener = new Thread(new DiscoveryListener(this.socket, this.group, this.interfaceName, infoService));
     }
 
     public void start() throws SocketException {
@@ -38,13 +40,15 @@ public class ReceiveMulticastOfNewNode {
         private final byte[] buffer = new byte[1000];
         private ObjectMapper objectMapper = new ObjectMapper();
         private Logger logger = LoggerFactory.getLogger(DiscoveryListener.class);
+        private final InfoService infoService;
 
-        public DiscoveryListener(DatagramSocket socket, InetAddress address, String interfaceName) throws SocketException {
+        public DiscoveryListener(DatagramSocket socket, InetAddress address, String interfaceName, InfoService infoService) throws SocketException {
             this.logger.info("Creating new DiscoveryListener thread.");
             this.socket = socket;
             this.group = new InetSocketAddress(address, 0);
             this.netIf = NetworkInterface.getByName(interfaceName);
             this.logger.info("Done creating new DiscoveryListener thread.");
+            this.infoService = infoService;
         }
 
         @Override
@@ -70,6 +74,7 @@ public class ReceiveMulticastOfNewNode {
                         // calculate the hash of the node that sent the multicast message
 
                         int hashOfNode = getHashFromString(node.getName());
+                        infoService.setHashOfNewNode(hashOfNode);
 
                         logger.info(String.valueOf(hashOfNode));
 

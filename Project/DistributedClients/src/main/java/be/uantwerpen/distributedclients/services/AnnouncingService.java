@@ -9,8 +9,14 @@ import org.springframework.stereotype.Service;
 
 import java.net.*;
 
+/*
+    a method that sends multicast message to existing nodes and the naming server
+ */
+
 @Service
 public class AnnouncingService {
+
+    private final InfoService infoService;
 
     private DatagramSocket socket;
     private InetSocketAddress group;
@@ -18,15 +24,16 @@ public class AnnouncingService {
 
     private Logger logger = LoggerFactory.getLogger(AnnouncingService.class);
 
-    public AnnouncingService() throws Exception {
+    public AnnouncingService(InfoService infoService) throws Exception {
+        this.infoService = infoService;
+
         InetAddress address = InetAddress.getByName("230.0.0.0");
         this.group = new InetSocketAddress(address, 6789);
         NetworkInterface netIf = NetworkInterface.getByName("virbr0");
         this.socket = new MulticastSocket(6789);
         this.socket.joinGroup(new InetSocketAddress(address, 0), netIf);
 
-        Node node = new Node(InetAddress.getLocalHost().getHostName(), InetAddress.getLoopbackAddress());
-        setBufferUsingNode(node);
+        setBufferUsingNode(this.infoService.getNode());
     }
 
     public void announce() {
