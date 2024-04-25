@@ -17,10 +17,6 @@ public class InfoService {
 
     private int amountOfNodes;
 
-    public InfoService() throws UnknownHostException {
-        this.node = new Node(InetAddress.getLocalHost().getHostName(), InetAddress.getLoopbackAddress());
-    }
-
     public Node getNode() {
         return node;
     }
@@ -62,7 +58,7 @@ public class InfoService {
                 this.nextID = newNode.hashCode();
                 // add http request to send info on current id and next  // ADD BODY
                 RestClient client = RestClient.builder()
-                        .baseUrl("http://" + node.getAddress().getHostAddress() + ":8080/nodes/next"
+                        .baseUrl("http://" + node.getSocketAddress() + "/nodes/next"
                             + "?currentId=" + this.node.hashCode() + "&nextId=" + this.nextID
                         )
                         .defaultHeader("Content-Type", "application/json")
@@ -74,7 +70,7 @@ public class InfoService {
                 this.previousID = newNode.hashCode();
                 // add http request to send info on current id and previous
                 RestClient client = RestClient.builder()
-                        .baseUrl("http://" + node.getAddress().getHostAddress() + ":8080/nodes/previous"
+                        .baseUrl("http://" + node.getSocketAddress() + "/nodes/previous"
                                 + "?currentId=" + this.node.hashCode() + "&previousId=" + this.previousID
                         )
                         .defaultHeader("Content-Type", "application/json")

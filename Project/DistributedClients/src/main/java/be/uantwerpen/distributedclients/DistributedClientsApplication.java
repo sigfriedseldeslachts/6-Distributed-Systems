@@ -16,7 +16,7 @@ public class DistributedClientsApplication {
 		ReceiveMulticastOfNewNode rec = new ReceiveMulticastOfNewNode(context.getBean(InfoService.class));
 		rec.start();
 
-		AnnouncingService announcingService = new AnnouncingService(context.getBean(InfoService.class));
+		AnnouncingService announcingService = new AnnouncingService(context.getBean(InfoService.class), context.getEnvironment());
 		while (true) {
 			announcingService.announce();
 			// Shitty wait for a second

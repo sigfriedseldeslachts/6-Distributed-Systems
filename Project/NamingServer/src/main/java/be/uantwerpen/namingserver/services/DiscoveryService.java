@@ -91,9 +91,11 @@ public class DiscoveryService {
                         nodeService.updateLastPing(node.getName());
                     }
 
+                    logger.info(node.getSocketAddress());
+
                     // Send client request to new node
                     RestClient client = RestClient.builder()
-                            .baseUrl("http://" + node.getAddress().getHostAddress() + ":8000/nodes/" + nodeService.getNumberOfNodes())
+                            .baseUrl("http://" + node.getSocketAddress() + "/nodes/" + nodeService.getNumberOfNodes())
                             .defaultHeader("Content-Type", "application/json")
                             .build();
                     client.post().retrieve();

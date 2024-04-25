@@ -3,33 +3,38 @@ package be.uantwerpen.distributedclients.models;
 import be.uantwerpen.distributedclients.utils.HashingFunction;
 
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 
 public class Node {
 
     private String name;
-    private InetAddress address;
+    private InetSocketAddress socketAddress;
 
     public Node() {}
 
-    public Node(String name, InetAddress address) {
+    public Node(String name, InetSocketAddress address) {
         this.name = name;
-        this.address = address;
+        this.socketAddress = address;
     }
 
     public void setName(String name) {
         this.name = name;
     }
 
-    public void setAddress(InetAddress address) {
-        this.address = address;
+    public void setAddress(InetSocketAddress address) {
+        this.socketAddress = address;
     }
 
     public String getName() {
         return name;
     }
 
-    public InetAddress getAddress() {
-        return address;
+    public InetSocketAddress getAddress() {
+        return socketAddress;
+    }
+
+    public String getSocketAddress() {
+        return socketAddress.getHostString() + ":" + socketAddress.getPort();
     }
 
     @Override

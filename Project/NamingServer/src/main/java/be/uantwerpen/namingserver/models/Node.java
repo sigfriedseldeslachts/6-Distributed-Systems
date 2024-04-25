@@ -3,31 +3,29 @@ package be.uantwerpen.namingserver.models;
 import be.uantwerpen.namingserver.utils.HashingFunction;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.time.LocalDateTime;
 
 public class Node {
 
     private String name;
-    private InetAddress address;
-    //private InetSocketAddress socketAddress;
+    private InetSocketAddress socketAddress;
     @JsonIgnore
     private LocalDateTime lastPing;
 
     public Node() {}
 
-    public Node(String name, InetAddress address) {
+    public Node(String name, InetSocketAddress address) {
         this.name = name;
-        this.address = address;
+        this.socketAddress = address;
     }
 
     public void setName(String name) {
         this.name = name;
     }
 
-    public void setAddress(InetAddress address) {
-        this.address = address;
+    public void setAddress(InetSocketAddress address) {
+        this.socketAddress = address;
     }
 
     public void setLastPing(LocalDateTime lastPing) {
@@ -38,8 +36,12 @@ public class Node {
         return name;
     }
 
-    public InetAddress getAddress() {
-        return address;
+    public InetSocketAddress getAddress() {
+        return socketAddress;
+    }
+
+    public String getSocketAddress() {
+        return socketAddress.getHostString() + ":" + socketAddress.getPort();
     }
 
     public LocalDateTime getLastPing() {
