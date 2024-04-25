@@ -10,11 +10,10 @@ import java.net.UnknownHostException;
 @Service
 public class InfoService {
 
-    private Node node;
+    private Node node; // Current node
 
     private int previousID;
     private int nextID;
-    private int hashOfNewNode;
 
     private int amountOfNodes;
 
@@ -46,14 +45,6 @@ public class InfoService {
         this.nextID = nextID;
     }
 
-    public int getHashOfNewNode() {
-        return hashOfNewNode;
-    }
-
-    public void setHashOfNewNode(int hashOfNewNode) {
-        this.hashOfNewNode = hashOfNewNode;
-    }
-
     public int getAmountOfNodes() {
         return amountOfNodes;
     }
@@ -62,24 +53,33 @@ public class InfoService {
         this.amountOfNodes = amountOfNodes;
     }
 
-    public void updateID() {
-        if (this.amountOfNodes<1) {
-            this.previousID = this.node.hashCode();
-            this.nextID = this.node.hashCode();
+    public void updateID(Node newNode) {
+        if (this.amountOfNodes<=1) {
+            this.previousID = newNode.hashCode();
+            this.nextID = newNode.hashCode();
         } else {
-            if ((this.node.hashCode() < this.hashOfNewNode) & (this.hashOfNewNode < this.nextID)) {
-                this.nextID = this.hashOfNewNode;
+            if ((this.node.hashCode() < newNode.hashCode()) & (newNode.hashCode() < this.nextID)) {
+                this.nextID = newNode.hashCode();
                 // add http request to send info on current id and next  // ADD BODY
                 RestClient client = RestClient.builder()
-                        .baseUrl("http://" + node.getAddress() + "/nodes/next")
+                        .baseUrl("http://" + node.getAddress().getHostAddress() + ":8080/nodes/next"
+                            + "?currentId=" + this.node.hashCode() + "&nextId=" + this.nextID
+                        )
                         .defaultHeader("Content-Type", "application/json")
                         .build();
                 client.post().retrieve();
 
             }
-            if ((this.previousID < this.hashOfNewNode) & (this.hashOfNewNode < this.node.hashCode())) {
-                this.previousID = this.hashOfNewNode;
+            if ((this.previousID < newNode.hashCode()) & (newNode.hashCode() < this.node.hashCode())) {
+                this.previousID = newNode.hashCode();
                 // add http request to send info on current id and previous
+                RestClient client = RestClient.builder()
+                        .baseUrl("http://" + node.getAddress().getHostAddress() + ":8080/nodes/previous"
+                                + "?currentId=" + this.node.hashCode() + "&previousId=" + this.previousID
+                        )
+                        .defaultHeader("Content-Type", "application/json")
+                        .build();
+                client.post().retrieve();
             }
         }
     }

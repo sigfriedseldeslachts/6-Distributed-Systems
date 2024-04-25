@@ -93,7 +93,7 @@ public class DiscoveryService {
 
                     // Send client request to new node
                     RestClient client = RestClient.builder()
-                            .baseUrl("http://" + node.getAddress() + "/nodes/" + nodeService.getNumberOfNodes())
+                            .baseUrl("http://" + node.getAddress().getHostAddress() + ":8000/nodes/" + nodeService.getNumberOfNodes())
                             .defaultHeader("Content-Type", "application/json")
                             .build();
                     client.post().retrieve();

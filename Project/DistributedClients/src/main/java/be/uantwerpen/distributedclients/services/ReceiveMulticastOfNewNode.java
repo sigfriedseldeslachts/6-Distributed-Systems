@@ -69,14 +69,11 @@ public class ReceiveMulticastOfNewNode {
                     Node node = null;
                     try {
                         node = this.objectMapper.readValue(received, Node.class);
-                        //logger.info("Received message: " + node.getName());
+                        if (node.hashCode() == this.infoService.getNode().hashCode()) {
+                            continue;
+                        }
 
-                        // calculate the hash of the node that sent the multicast message
-
-                        int hashOfNode = getHashFromString(node.getName());
-                        infoService.setHashOfNewNode(hashOfNode);
-
-                        logger.info(String.valueOf(hashOfNode));
+                        infoService.updateID(node);
 
                     } catch (JsonProcessingException e) {
                         logger.warn("Failed to parse received message: " + received);

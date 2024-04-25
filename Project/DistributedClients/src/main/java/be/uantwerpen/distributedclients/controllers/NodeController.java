@@ -3,25 +3,44 @@ package be.uantwerpen.distributedclients.controllers;
 import be.uantwerpen.distributedclients.services.InfoService;
 import org.springframework.web.bind.annotation.*;
 
-@RestController("/nodes")
+import java.util.HashMap;
+
+@RestController
+@RequestMapping("nodes")
 public class NodeController {
 
     private InfoService infoservice;
 
-    @PostMapping("{amount}")
-    public void AmountExistingNodes(@RequestParam int amount) {
-        this.infoservice.setAmountOfNodes(amount);
+    public NodeController(InfoService infoservice) {
+        this.infoservice = infoservice;
     }
 
-    @PostMapping("/next")
-    public void CurrentAndNext(@RequestBody int currentID,@RequestBody int nextID) {
+    @GetMapping
+    public Object ShowDebug() {
+        HashMap<String, Object> map = new HashMap<>();
+
+        map.put("amountOfNodes", infoservice.getAmountOfNodes());
+        map.put("Node", infoservice.getNode());
+        map.put("previousID", infoservice.getPreviousID());
+        map.put("nextID", infoservice.getNextID());
+
+        return map;
+    }
+
+    @PostMapping("next")
+    public void CurrentAndNext(@RequestParam int currentID,@RequestParam int nextID) {
         this.infoservice.setPreviousID(currentID);
         this.infoservice.setNextID(nextID);
     }
 
-    @PostMapping("/previous")
-    public void CurrentAndPrevious(@RequestBody int currentID,@RequestBody int previousID) {
+    @PostMapping("previous")
+    public void CurrentAndPrevious(@RequestParam int currentID, @RequestParam int previousID) {
         this.infoservice.setNextID(currentID);
         this.infoservice.setPreviousID(previousID);
+    }
+
+    @PostMapping("{amount}")
+    public void AmountExistingNodes(@PathVariable int amount) {
+        this.infoservice.setAmountOfNodes(amount);
     }
 }
