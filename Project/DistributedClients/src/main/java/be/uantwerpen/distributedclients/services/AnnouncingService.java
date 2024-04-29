@@ -37,8 +37,15 @@ public class AnnouncingService {
         NetworkInterface netIf = NetworkInterface.getByName(env.getProperty("app.interface"));
         String nodeName = env.getProperty("app.nodeName", InetAddress.getLocalHost().getHostName());
 
+        // Get the IPv4 address of the network interface, we do this because I am too fucking lazy to bother with IPv6 with this dumb course
+        InetAddress inetAddress = netIf.getInterfaceAddresses().stream()
+                .map(InterfaceAddress::getAddress)
+                .filter(address -> address instanceof Inet4Address)
+                .findFirst()
+                .orElseThrow(() -> new UnknownHostException("No IPv4 address found on interface " + netIf.getName()));
+
         // Create the own node
-        Node selfNode = new Node(nodeName, new InetSocketAddress(netIf.getInetAddresses().nextElement(), env.getProperty("server.port", Integer.class, 8000)));
+        Node selfNode = new Node(nodeName, new InetSocketAddress(inetAddress, env.getProperty("server.port", Integer.class, 8000)));
         this.infoService.setNode(selfNode);
 
         // Setup multicast socket
