@@ -28,11 +28,17 @@ public class AnnouncingService {
     public AnnouncingService(InfoService infoService, Environment env) throws Exception {
         this.infoService = infoService;
 
+        // Show all interfaces
+        NetworkInterface.getNetworkInterfaces().asIterator().forEachRemaining(i -> {
+           System.out.println(i.getName());
+        });
+
         // Get network interface on which we want to send multicast messages
         NetworkInterface netIf = NetworkInterface.getByName(env.getProperty("app.interface"));
+        String nodeName = env.getProperty("app.nodeName", InetAddress.getLocalHost().getHostName());
 
         // Create the own node
-        Node selfNode = new Node(InetAddress.getLocalHost().getHostName(), new InetSocketAddress(netIf.getInetAddresses().nextElement(), env.getProperty("server.port", Integer.class, 8000)));
+        Node selfNode = new Node(nodeName, new InetSocketAddress(netIf.getInetAddresses().nextElement(), env.getProperty("server.port", Integer.class, 8000)));
         this.infoService.setNode(selfNode);
 
         // Setup multicast socket
