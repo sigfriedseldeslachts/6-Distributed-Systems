@@ -29,14 +29,22 @@ public class NodeController {
     }
 
     @PostMapping("next")
-    public void CurrentAndNext(@RequestParam int currentID,@RequestParam int nextID) {
+    public void CurrentAndNext(@RequestParam int currentID, @RequestParam int nextID) {
         this.infoservice.setPreviousID(currentID);
+        this.infoservice.setNextID(nextID);
+    }
+    @PutMapping("next")
+    public void Next(@RequestParam int nextID) {
         this.infoservice.setNextID(nextID);
     }
 
     @PostMapping("previous")
     public void CurrentAndPrevious(@RequestParam int currentID, @RequestParam int previousID) {
         this.infoservice.setNextID(currentID);
+        this.infoservice.setPreviousID(previousID);
+    }
+    @PutMapping("previous")
+    public void Previous(@RequestParam int previousID) {
         this.infoservice.setPreviousID(previousID);
     }
 

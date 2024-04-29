@@ -2,16 +2,12 @@ package be.uantwerpen.distributedclients.controllers;
 
 import be.uantwerpen.distributedclients.models.Node;
 import be.uantwerpen.distributedclients.services.InfoService;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
 
-import java.util.Arrays;
 import java.util.List;
 
 @RestController
@@ -26,21 +22,32 @@ public class ShutdownController {
                 .baseUrl("http://" + this.infoservice.getNamingserverAddress() + "/nodes/")
                 .defaultHeader("Content-Type", "application/json")
                 .build();
-        List<Node> nodes = client.get().retrieve().body(new ParameterizedTypeReference<>() {});
+        List<Node> allNodes = client.get().retrieve().body(new ParameterizedTypeReference<>() {});
 
+        String nextIdAddress = "";
+        String previousIdAddress = "";
+        assert allNodes != null;
+        for (Node node : allNodes) {
+            if (node.hashCode() == this.infoservice.getNextID()) {
+                nextIdAddress = node.getSocketAddress();
+            }
+            if (node.hashCode() == this.infoservice.getPreviousID()) {
+                previousIdAddress = node.getSocketAddress();
+            }
+        }
         //Send NextID to previous node
         client = RestClient.builder()
-                .baseUrl("http://" + nodes.get(this.infoservice.getNextID()).getSocketAddress())
+                .baseUrl("http://" + previousIdAddress + "/next/" + this.infoservice.getNextID())
                 .defaultHeader("Content-Type", "application/json")
                 .build();
-        client.post().retrieve();
+        client.put().retrieve();
 
         //Send PreviousID to next node
         client = RestClient.builder()
-                .baseUrl("http://" + nodes.get(this.infoservice.getPreviousID()).getSocketAddress())
+                .baseUrl("http://" + nextIdAddress + "previous/" + this.infoservice.getPreviousID())
                 .defaultHeader("Content-Type", "application/json")
                 .build();
-        client.post().retrieve();
+        client.put().retrieve();
 
         //Send delete request to naming server
         client = RestClient.builder()
