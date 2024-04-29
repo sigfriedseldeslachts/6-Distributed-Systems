@@ -47,8 +47,8 @@ public class NodeService {
         }
     }
 
-    public void deleteNode(Node node) {
-        nodes.remove(node.hashCode());
+    public void deleteNode(int hashcode) {
+        nodes.remove(hashcode);
 
         try {
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File("nodes.json"), nodes);

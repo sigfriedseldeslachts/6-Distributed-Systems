@@ -5,7 +5,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 
 @Service
 public class InfoService {
@@ -16,6 +15,15 @@ public class InfoService {
     private int nextID;
 
     private int amountOfNodes;
+    private String namingserverAddress;
+
+    public String getNamingserverAddress() {
+        return namingserverAddress;
+    }
+
+    public void setNamingserverAddress(String namingserverAddress) {
+        this.namingserverAddress = namingserverAddress;
+    }
 
     public Node getNode() {
         return node;

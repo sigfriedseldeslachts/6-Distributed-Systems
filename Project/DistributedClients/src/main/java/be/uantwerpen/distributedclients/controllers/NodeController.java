@@ -1,6 +1,7 @@
 package be.uantwerpen.distributedclients.controllers;
 
 import be.uantwerpen.distributedclients.services.InfoService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -40,7 +41,8 @@ public class NodeController {
     }
 
     @PostMapping("{amount}")
-    public void AmountExistingNodes(@PathVariable int amount) {
+    public void AmountExistingNodes(@PathVariable int amount, HttpServletRequest request) {
+        this.infoservice.setNamingserverAddress(request.getRemoteAddr());
         this.infoservice.setAmountOfNodes(amount);
     }
 }
