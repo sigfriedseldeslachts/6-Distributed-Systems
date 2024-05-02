@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.net.*;
+import java.time.LocalDateTime;
 
 @Service
 public class ReceiveMulticastOfNewNode {
@@ -68,9 +69,11 @@ public class ReceiveMulticastOfNewNode {
                     try {
                         node = this.objectMapper.readValue(received, Node.class);
                         if (node.hashCode() != this.infoService.getSelfNode().hashCode()) {
+                            node.setLastPing(LocalDateTime.now());
                             this.infoService.addNewNode(node);
                         }
 
+                        this.infoService.removeStaleNodes();
                         this.infoService.updateNodeOrder();
                     } catch (JsonProcessingException e) {
                         logger.warn("Failed to parse received message: " + received);

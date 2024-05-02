@@ -24,7 +24,7 @@ public class NodeController {
         map.put("nextID", infoservice.getNextID());
         map.put("own_hash", infoservice.getSelfNode().hashCode());
         map.put("own_node", infoservice.getSelfNode());
-        map.put("amountOfNodes", infoservice.getAmountOfNodes());
+        map.put("all_nodes", infoservice.getNodes());
 
         return map;
     }

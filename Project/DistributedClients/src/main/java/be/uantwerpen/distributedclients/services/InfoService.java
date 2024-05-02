@@ -19,8 +19,6 @@ public class InfoService {
     private Node selfNode;
     private final TreeMap<Integer, Node> nodes = new TreeMap<>();
 
-
-
     public String getNamingServerAddress() {
         return namingServerAddress;
     }
@@ -46,22 +44,17 @@ public class InfoService {
         return previousID;
     }
 
-    public void setPreviousID(int previousID) {
-        this.previousID = previousID;
-    }
-
     public int getNextID() {
         return nextID;
     }
 
-    public void setNextID(int nextID) {
-        this.nextID = nextID;
+    public TreeMap<Integer, Node> getNodes() {
+        return nodes;
     }
 
-    public int getAmountOfNodes() {
-        return nodes.keySet().size();
-    }
-
+    /**
+     * Update the order of the nodes
+     */
     public void updateNodeOrder() {
         // Find the index where I am currently at
         int index = 0;
@@ -98,4 +91,22 @@ public class InfoService {
         this.nextID = keys.get(index + 1);
     }
 
+    /**
+     * Remove all nodes that are stale
+     */
+    public void removeStaleNodes() {
+        this.nodes.entrySet().removeIf(entry -> {
+            // Obviously we don't want to remove ourselves
+            if (entry.getValue().hashCode() == this.selfNode.hashCode()) {
+                return false;
+            }
+
+            if (entry.getValue().isStale()) {
+                System.out.println("Removing stale node: " + entry.getValue().getName());
+                return true;
+            }
+
+            return false;
+        });
+    }
 }
