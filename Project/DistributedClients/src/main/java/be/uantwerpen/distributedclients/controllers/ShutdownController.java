@@ -19,7 +19,7 @@ public class ShutdownController {
     public void shutdown(){
         //Get Map of all nodes in naming server
         RestClient client = RestClient.builder()
-                .baseUrl("http://" + this.infoservice.getNamingserverAddress() + "/nodes/")
+                .baseUrl("http://" + this.infoservice.getNamingServerAddress() + "/nodes/")
                 .defaultHeader("Content-Type", "application/json")
                 .build();
         List<Node> allNodes = client.get().retrieve().body(new ParameterizedTypeReference<>() {});
@@ -51,7 +51,7 @@ public class ShutdownController {
 
         //Send delete request to naming server
         client = RestClient.builder()
-                .baseUrl("http://" + this.infoservice.getNamingserverAddress() + "/nodes/" + this.infoservice.getNode().hashCode())
+                .baseUrl("http://" + this.infoservice.getNamingServerAddress() + "/nodes/" + this.infoservice.getSelfNode().hashCode())
                 .defaultHeader("Content-Type", "application/json")
                 .build();
         client.delete().retrieve();

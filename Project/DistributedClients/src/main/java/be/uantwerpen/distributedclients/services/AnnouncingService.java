@@ -5,7 +5,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
@@ -33,11 +32,13 @@ public class AnnouncingService {
            System.out.println(i.getName());
         });
 
+        System.out.println("Interface: " + env.getProperty("app.interface"));
+
         // Get network interface on which we want to send multicast messages
         NetworkInterface netIf = NetworkInterface.getByName(env.getProperty("app.interface"));
         String nodeName = env.getProperty("app.nodeName", InetAddress.getLocalHost().getHostName());
 
-        // Get the IPv4 address of the network interface, we do this because I am too fucking lazy to bother with IPv6 with this dumb course
+        // Get the IPv4 address of the networgitk interface, we do this because I am too fucking lazy to bother with IPv6 with this dumb course
         InetAddress inetAddress = netIf.getInterfaceAddresses().stream()
                 .map(InterfaceAddress::getAddress)
                 .filter(address -> address instanceof Inet4Address)
@@ -46,7 +47,7 @@ public class AnnouncingService {
 
         // Create the own node
         Node selfNode = new Node(nodeName, new InetSocketAddress(inetAddress, env.getProperty("server.port", Integer.class, 8000)));
-        this.infoService.setNode(selfNode);
+        this.infoService.setSelfNode(selfNode);
 
         // Setup multicast socket
         InetAddress address = InetAddress.getByName("230.0.0.0");

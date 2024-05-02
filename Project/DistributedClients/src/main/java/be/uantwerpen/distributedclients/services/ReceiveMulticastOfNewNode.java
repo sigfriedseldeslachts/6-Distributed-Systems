@@ -9,8 +9,6 @@ import org.springframework.stereotype.Service;
 
 import java.net.*;
 
-import static be.uantwerpen.distributedclients.utils.HashingFunction.getHashFromString;
-
 @Service
 public class ReceiveMulticastOfNewNode {
     private final String interfaceName = "any";
@@ -69,12 +67,11 @@ public class ReceiveMulticastOfNewNode {
                     Node node = null;
                     try {
                         node = this.objectMapper.readValue(received, Node.class);
-                        if (node.hashCode() == this.infoService.getNode().hashCode()) {
-                            continue;
+                        if (node.hashCode() != this.infoService.getSelfNode().hashCode()) {
+                            this.infoService.addNewNode(node);
                         }
 
-                        infoService.updateID(node);
-
+                        this.infoService.updateNodeOrder();
                     } catch (JsonProcessingException e) {
                         logger.warn("Failed to parse received message: " + received);
                         e.printStackTrace();
