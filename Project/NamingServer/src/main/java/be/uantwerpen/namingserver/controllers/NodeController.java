@@ -21,12 +21,6 @@ public class NodeController {
         return this.nodeService.getAllNodes();
     }
 
-    @PostMapping("")
-    public Node addNode(@RequestBody Node node) {
-        this.nodeService.addNode(node);
-        return node;
-    }
-
     @DeleteMapping("{hashcode}")
     public void deleteNode(@PathVariable int hashcode) {
         this.nodeService.deleteNode(hashcode);

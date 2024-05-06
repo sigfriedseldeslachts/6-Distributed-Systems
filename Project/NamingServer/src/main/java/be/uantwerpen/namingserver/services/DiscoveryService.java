@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 
 import java.net.*;
 
@@ -72,12 +71,11 @@ public class DiscoveryService {
                     String received = new String(packet.getData(), 0, packet.getLength());
 
                     // Parse the node
-                    Node node = null;
+                    Node node;
                     try {
                         node = this.objectMapper.readValue(received, Node.class);
-                        logger.info("Received message: " + node.getName());
                     } catch (JsonProcessingException e) {
-                        logger.warn("Failed to parse received message: " + received);
+                        logger.warn("Failed to parse received message: {}", received);
                         e.printStackTrace();
                         continue;
                     }
@@ -88,10 +86,8 @@ public class DiscoveryService {
                         nodeService.addNode(node);
                     } else {
                         this.logger.info("Node already known: " + node.getName());
-                        nodeService.updateLastPing(node.getName());
+                        nodeService.updateNode(node); // We don't update everything
                     }
-
-                    logger.info(node.getSocketAddress());
                 }
             } catch (Exception e) {
                 logger.error("Failed to listen for incoming messages: " + e.getMessage());

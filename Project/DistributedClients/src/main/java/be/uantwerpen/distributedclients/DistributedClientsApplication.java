@@ -11,21 +11,6 @@ import org.springframework.context.ApplicationContext;
 public class DistributedClientsApplication {
 
 	public static void main(String[] args) throws Exception {
-		ApplicationContext context = SpringApplication.run(DistributedClientsApplication.class, args);
-
-		ReceiveMulticastOfNewNode rec = new ReceiveMulticastOfNewNode(context.getBean(InfoService.class));
-		rec.start();
-
-		AnnouncingService announcingService = new AnnouncingService(context.getBean(InfoService.class), context.getEnvironment());
-		while (true) {
-			announcingService.announce();
-			// Shitty wait for a second
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		}
+		SpringApplication.run(DistributedClientsApplication.class, args);
 	}
-
 }

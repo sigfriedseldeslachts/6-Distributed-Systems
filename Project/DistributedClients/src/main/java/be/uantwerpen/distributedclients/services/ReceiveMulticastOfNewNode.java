@@ -13,22 +13,14 @@ import java.time.LocalDateTime;
 @Service
 public class ReceiveMulticastOfNewNode {
     private final String interfaceName = "any";
-
-    private final DatagramSocket socket;
-    private final InetAddress group;
-
-    private Thread listener;
+    private final Thread listener;
 
     public ReceiveMulticastOfNewNode(InfoService infoService) throws Exception {
-
-        this.socket = new DatagramSocket();
-        this.group = InetAddress.getByName("230.0.0.0");
+        DatagramSocket socket = new DatagramSocket();
+        InetAddress group = InetAddress.getByName("230.0.0.0");
 
         // Launch separate thread to listen for incoming messages
-        this.listener = new Thread(new DiscoveryListener(this.socket, this.group, this.interfaceName, infoService));
-    }
-
-    public void start() throws SocketException {
+        this.listener = new Thread(new DiscoveryListener(socket, group, this.interfaceName, infoService));
         this.listener.start();
     }
 
@@ -68,20 +60,21 @@ public class ReceiveMulticastOfNewNode {
                     Node node = null;
                     try {
                         node = this.objectMapper.readValue(received, Node.class);
+                        // Make sure the node is not the current node
                         if (node.hashCode() != this.infoService.getSelfNode().hashCode()) {
                             node.setLastPing(LocalDateTime.now());
                             this.infoService.addNewNode(node);
                         }
 
-                        this.infoService.removeStaleNodes();
+                        // Update the order of the nodes
                         this.infoService.updateNodeOrder();
                     } catch (JsonProcessingException e) {
-                        logger.warn("Failed to parse received message: " + received);
+                        logger.warn("Failed to parse received message: {}", received);
                         e.printStackTrace();
                     }
                 }
             } catch (Exception e) {
-                logger.error("Failed to listen for incoming messages: " + e.getMessage());
+                logger.error("Failed to listen for incoming messages: {}", e.getMessage());
                 e.printStackTrace();
             }
         }

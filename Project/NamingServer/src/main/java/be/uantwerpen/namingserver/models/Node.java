@@ -11,7 +11,8 @@ public class Node {
     private String name;
     private InetSocketAddress socketAddress;
     @JsonIgnore
-    private LocalDateTime lastPing;
+    private LocalDateTime lastPing = LocalDateTime.now();
+    private boolean leaving = false;
 
     public Node() {}
 
@@ -46,6 +47,19 @@ public class Node {
 
     public LocalDateTime getLastPing() {
         return lastPing;
+    }
+
+    public boolean isLeaving() {
+        return leaving;
+    }
+
+    public void setLeaving() {
+        this.leaving = true;
+    }
+
+    @JsonIgnore
+    public boolean isStale() {
+        return lastPing.isBefore(LocalDateTime.now().minusSeconds(10));
     }
 
     @Override

@@ -3,9 +3,13 @@ package be.uantwerpen.distributedclients.services;
 import be.uantwerpen.distributedclients.models.Node;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.net.*;
@@ -15,24 +19,26 @@ import java.net.*;
  */
 
 @Service
+@EnableAsync
 public class AnnouncingService {
+    private final DatagramSocket socket;
+    private final InetSocketAddress group;
+    private byte[] buffer;
+    private final Logger logger = LoggerFactory.getLogger(AnnouncingService.class);
 
     private final InfoService infoService;
-    private DatagramSocket socket;
-    private InetSocketAddress group;
-    private byte[] buffer;
+    private final ReceiveMulticastOfNewNode receiveMulticastOfNewNode;
 
-    private Logger logger = LoggerFactory.getLogger(AnnouncingService.class);
-
-    public AnnouncingService(InfoService infoService, Environment env) throws Exception {
+    public AnnouncingService(InfoService infoService, ReceiveMulticastOfNewNode receiveMulticastOfNewNode, Environment env) throws Exception {
         this.infoService = infoService;
+        this.receiveMulticastOfNewNode = receiveMulticastOfNewNode;
 
         // Show all interfaces
+        logger.info("Available network interfaces:");
         NetworkInterface.getNetworkInterfaces().asIterator().forEachRemaining(i -> {
-           System.out.println(i.getName());
+           logger.info(" - {}", i.getName());
         });
-
-        System.out.println("Interface: " + env.getProperty("app.interface"));
+        logger.info("Selected interface: {}", env.getProperty("app.interface"));
 
         // Get network interface on which we want to send multicast messages
         NetworkInterface netIf = NetworkInterface.getByName(env.getProperty("app.interface"));
@@ -54,11 +60,12 @@ public class AnnouncingService {
         this.group = new InetSocketAddress(address, 6789);
         this.socket = new MulticastSocket(6789);
         this.socket.joinGroup(new InetSocketAddress(address, 0), netIf);
-
-        setBufferUsingNode(selfNode); // Set buffer to the node
     }
 
-    public void announce() {
+    @Async
+    @Scheduled(fixedRate = 1000)
+    public void announce() throws JsonProcessingException {
+        setBufferUsingNode(this.infoService.getSelfNode()); // Set buffer to the node
         DatagramPacket packet = new DatagramPacket(buffer, buffer.length, group);
         try {
             socket.send(packet);
@@ -74,4 +81,13 @@ public class AnnouncingService {
         this.buffer = objectMapper.writeValueAsString(node).getBytes();
     }
 
+    @PreDestroy
+    public void destroy() throws InterruptedException, JsonProcessingException {
+        this.infoService.getSelfNode().setLeaving();
+        logger.info("Node is leaving, sending leaving messages, waiting for 5 seconds before exiting...");
+        for (int i = 0; i < 5; i++) {
+            announce();
+            Thread.sleep(1000);
+        }
+    }
 }

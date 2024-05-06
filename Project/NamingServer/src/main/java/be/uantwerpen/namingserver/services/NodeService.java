@@ -2,6 +2,9 @@ package be.uantwerpen.namingserver.services;
 
 import be.uantwerpen.namingserver.models.Node;
 import be.uantwerpen.namingserver.utils.HashingFunction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,8 +20,8 @@ import java.util.List;
 public class NodeService {
 
     private final HashMap<Integer, Node> nodes = new HashMap<>();
-
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Logger logger = LoggerFactory.getLogger(NodeService.class);
 
     public int getNumberOfNodes() {
         return nodes.size();
@@ -95,11 +98,37 @@ public class NodeService {
         return new ArrayList<>(this.nodes.values());
     }
 
-    public void updateLastPing(String name) {
-        Node node = this.getNode(name);
-        if (node == null) return;
+    public void updateNode(Node node) {
+        Node oldNode = this.nodes.get(node.hashCode());
+        oldNode.setLastPing(LocalDateTime.now());
 
-        node.setLastPing(LocalDateTime.now());
+        // We only allow to set the node leaving and not disable it
+        // Otherwise if we can "cancel" a shutdown it may cause problems
+        if (node.isLeaving()) {
+            oldNode.setLeaving();
+        }
+    }
+
+    /**
+     * Remove all nodes that are stale
+     */
+    @Scheduled(fixedRate = 5000)
+    public void removeStaleNodes() {
+        logger.info("Removing stale nodes...");
+
+        this.nodes.entrySet().removeIf(entry -> {
+            if (entry.getValue().isLeaving()) {
+                logger.info("Removing leaving node: {}", entry.getValue().getName());
+                return true;
+            }
+
+            if (entry.getValue().isStale()) {
+                logger.info("Removing stale node: {}", entry.getValue().getName());
+                return true;
+            }
+
+            return false;
+        });
     }
 
 }

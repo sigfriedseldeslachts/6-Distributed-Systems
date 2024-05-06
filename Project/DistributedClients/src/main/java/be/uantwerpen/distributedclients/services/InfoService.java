@@ -1,31 +1,24 @@
 package be.uantwerpen.distributedclients.services;
 
 import be.uantwerpen.distributedclients.models.Node;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.TreeMap;
 
 @Service
+@EnableAsync
 public class InfoService {
-
-    // Current node
-
     private int previousID;
     private int nextID;
-
-    private String namingServerAddress;
-
     private Node selfNode;
     private final TreeMap<Integer, Node> nodes = new TreeMap<>();
-
-    public String getNamingServerAddress() {
-        return namingServerAddress;
-    }
-
-    public void setNamingServerAddress(String namingServerAddress) {
-        this.namingServerAddress = namingServerAddress;
-    }
+    private final Logger logger = LoggerFactory.getLogger(AnnouncingService.class);
 
     public Node getSelfNode() {
         return selfNode;
@@ -94,19 +87,30 @@ public class InfoService {
     /**
      * Remove all nodes that are stale
      */
+    @Async
+    @Scheduled(fixedRate = 5000)
     public void removeStaleNodes() {
+        logger.info("Removing stale nodes...");
+
         this.nodes.entrySet().removeIf(entry -> {
             // Obviously we don't want to remove ourselves
             if (entry.getValue().hashCode() == this.selfNode.hashCode()) {
                 return false;
             }
 
+            if (entry.getValue().isLeaving()) {
+                logger.info("Removing leaving node: {}", entry.getValue().getName());
+                return true;
+            }
+
             if (entry.getValue().isStale()) {
-                System.out.println("Removing stale node: " + entry.getValue().getName());
+                logger.info("Removing stale node: {}", entry.getValue().getName());
                 return true;
             }
 
             return false;
         });
+
+        updateNodeOrder();
     }
 }
