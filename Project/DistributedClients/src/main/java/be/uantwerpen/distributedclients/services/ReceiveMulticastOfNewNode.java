@@ -64,6 +64,7 @@ public class ReceiveMulticastOfNewNode {
                         if (node.hashCode() != this.infoService.getSelfNode().hashCode()) {
                             node.setLastPing(LocalDateTime.now());
                             this.infoService.addNewNode(node);
+                            logger.info("Message received, added/updated node: {}", received);
                         }
 
                         // Update the order of the nodes

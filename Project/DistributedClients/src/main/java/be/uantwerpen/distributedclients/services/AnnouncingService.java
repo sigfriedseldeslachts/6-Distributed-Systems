@@ -59,7 +59,6 @@ public class AnnouncingService {
         InetAddress address = InetAddress.getByName("230.0.0.0");
         this.group = new InetSocketAddress(address, 6789);
         this.socket = new MulticastSocket(6789);
-        this.socket.joinGroup(new InetSocketAddress(address, 0), netIf);
     }
 
     @Async
