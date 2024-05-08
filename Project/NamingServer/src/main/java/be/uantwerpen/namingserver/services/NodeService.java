@@ -62,11 +62,14 @@ public class NodeService {
 
 
     public Node getNodeToStoreFileOn(String filename) {
+        return getNodeToStoreFileOn(HashingFunction.getHashFromString(filename));
+    }
+
+    public Node getNodeToStoreFileOn(int file_hash) {
         if (this.nodes.isEmpty()) {
             throw new IllegalStateException("No nodes available to store file on");
         }
 
-        int file_hash = HashingFunction.getHashFromString(filename);
         int biggestNode = Integer.MIN_VALUE;
         int smallestDiff = Integer.MAX_VALUE;
         int smallestDiffNode = Integer.MAX_VALUE;

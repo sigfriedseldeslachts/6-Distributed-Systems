@@ -3,10 +3,11 @@ package be.uantwerpen.namingserver.controllers;
 import be.uantwerpen.namingserver.models.Node;
 import be.uantwerpen.namingserver.services.NodeService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/files")
@@ -27,6 +28,22 @@ public class FileController {
         System.out.println(node);
 
         return node;
+    }
+
+    @PostMapping("replication")
+    public Map<Integer, Integer> replicate(@RequestBody List<Integer> fileHashes)
+    {
+        Map<Integer, Integer> nodesToReplicateFilesOn = new HashMap<>();
+        if (fileHashes == null || fileHashes.isEmpty()) {
+            return nodesToReplicateFilesOn;
+        }
+
+        for (int fileHash : fileHashes) {
+            Node node = nodeService.getNodeToStoreFileOn(fileHash);
+            nodesToReplicateFilesOn.put(fileHash, node.hashCode());
+        }
+
+        return nodesToReplicateFilesOn;
     }
 
 }
