@@ -118,12 +118,6 @@ public class NodeService {
     @Scheduled(fixedRate = 5000)
     public void removeStaleNodes() {
         logger.info("Removing stale nodes...");
-        //update json file
-        try {
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File("nodes.json"), nodes);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
 
         this.nodes.entrySet().removeIf(entry -> {
             if (entry.getValue().isLeaving()) {
@@ -138,6 +132,13 @@ public class NodeService {
 
             return false;
         });
+
+        //update json file
+        try {
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File("nodes.json"), nodes);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 }
