@@ -15,12 +15,12 @@ public class ReceiveMulticastOfNewNode {
     private final String interfaceName = "any";
     private final Thread listener;
 
-    public ReceiveMulticastOfNewNode(InfoService infoService) throws Exception {
+    public ReceiveMulticastOfNewNode(InfoService infoService, FileService fileService) throws Exception {
         DatagramSocket socket = new DatagramSocket();
         InetAddress group = InetAddress.getByName("230.0.0.0");
 
         // Launch separate thread to listen for incoming messages
-        this.listener = new Thread(new DiscoveryListener(socket, group, this.interfaceName, infoService));
+        this.listener = new Thread(new DiscoveryListener(socket, group, this.interfaceName, infoService, fileService));
         this.listener.start();
     }
 
@@ -32,14 +32,16 @@ public class ReceiveMulticastOfNewNode {
         private ObjectMapper objectMapper = new ObjectMapper();
         private Logger logger = LoggerFactory.getLogger(DiscoveryListener.class);
         private final InfoService infoService;
+        private FileService fileService;
 
-        public DiscoveryListener(DatagramSocket socket, InetAddress address, String interfaceName, InfoService infoService) throws SocketException {
+        public DiscoveryListener(DatagramSocket socket, InetAddress address, String interfaceName, InfoService infoService, FileService fileService) throws SocketException {
             this.logger.info("Creating new DiscoveryListener thread.");
             this.socket = socket;
             this.group = new InetSocketAddress(address, 0);
             this.netIf = NetworkInterface.getByName(interfaceName);
             this.logger.info("Done creating new DiscoveryListener thread.");
             this.infoService = infoService;
+            this.fileService = fileService;
         }
 
         @Override
@@ -69,6 +71,8 @@ public class ReceiveMulticastOfNewNode {
 
                         // Update the order of the nodes
                         this.infoService.updateNodeOrder();
+
+                        this.fileService.send();
                     } catch (JsonProcessingException e) {
                         logger.warn("Failed to parse received message: {}", received);
                         e.printStackTrace();

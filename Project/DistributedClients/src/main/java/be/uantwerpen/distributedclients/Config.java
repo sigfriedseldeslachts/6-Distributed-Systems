@@ -1,6 +1,7 @@
 package be.uantwerpen.distributedclients;
 
 import be.uantwerpen.distributedclients.services.AnnouncingService;
+import be.uantwerpen.distributedclients.services.FileService;
 import be.uantwerpen.distributedclients.services.InfoService;
 import be.uantwerpen.distributedclients.services.ReceiveMulticastOfNewNode;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
@@ -16,8 +17,8 @@ public class Config {
 
     @Bean
     @Scope(value = ConfigurableBeanFactory.SCOPE_SINGLETON)
-    public ReceiveMulticastOfNewNode receiveMulticastOfNewNode(InfoService infoService) throws Exception {
-        return new ReceiveMulticastOfNewNode(infoService);
+    public ReceiveMulticastOfNewNode receiveMulticastOfNewNode(InfoService infoService, FileService fileService) throws Exception {
+        return new ReceiveMulticastOfNewNode(infoService, fileService);
     }
 
 }
