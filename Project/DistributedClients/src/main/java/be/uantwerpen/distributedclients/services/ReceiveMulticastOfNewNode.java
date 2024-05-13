@@ -73,7 +73,7 @@ public class ReceiveMulticastOfNewNode {
                         this.infoService.updateNodeOrder();
 
                         this.fileService.send();
-                    } catch (JsonProcessingException e) {
+                    } catch (Exception e) {
                         logger.warn("Failed to parse received message: {}", received);
                         e.printStackTrace();
                     }

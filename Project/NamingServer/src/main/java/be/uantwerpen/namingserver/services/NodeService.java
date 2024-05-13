@@ -33,6 +33,11 @@ public class NodeService {
     private final Map<String, String> announceNamingServerBody = new HashMap<>();
 
     public NodeService(Environment env) throws SocketException, UnknownHostException {
+        logger.info("Available network interfaces:");
+        NetworkInterface.getNetworkInterfaces().asIterator().forEachRemaining(i -> {
+            logger.info(" - {}", i.getName());
+        });
+
         // Get the address of the interface
         NetworkInterface netIf = NetworkInterface.getByName(env.getProperty("app.interface", "lo"));
         InetAddress inetAddress = netIf.getInterfaceAddresses().stream()
