@@ -4,13 +4,15 @@ import be.uantwerpen.distributedclients.services.InfoService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.InetSocketAddress;
 import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("nodes")
 public class NodeController {
 
-    private InfoService infoservice;
+    private final InfoService infoservice;
 
     public NodeController(InfoService infoservice) {
         this.infoservice = infoservice;
@@ -25,7 +27,21 @@ public class NodeController {
         map.put("own_hash", infoservice.getSelfNode().hashCode());
         map.put("own_node", infoservice.getSelfNode());
         map.put("all_nodes", infoservice.getNodes());
+        map.put("naming_server", infoservice.getNamingServerAddress());
 
         return map;
+    }
+
+    @PatchMapping("server")
+    public void UpdateNamingServer(@RequestBody Map<String, String> body) {
+        // Check if the address and port are valid
+        if (!body.containsKey("address") || !body.containsKey("port")) {
+            throw new IllegalArgumentException("Invalid body");
+        }
+
+        InetSocketAddress address = InetSocketAddress.createUnresolved(body.get("address"), Integer.parseInt(body.get("port")));
+        this.infoservice.setNamingServerAddress(address);
+
+        System.out.println("Updated naming server address to " + address);
     }
 }

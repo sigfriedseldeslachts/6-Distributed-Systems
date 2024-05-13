@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import java.net.*;
@@ -12,13 +13,9 @@ import java.net.*;
 @Service
 public class DiscoveryService {
 
-    private final String interfaceName = "any";
-
     private final DatagramSocket socket;
     private final InetAddress group;
-
     private final NodeService nodeService;
-
     private Thread listener;
 
     private final Logger logger = LoggerFactory.getLogger(DiscoveryService.class);
@@ -30,7 +27,7 @@ public class DiscoveryService {
         this.group = InetAddress.getByName("230.0.0.0");
 
         // Launch separate thread to listen for incoming messages
-        this.listener = new Thread(new DiscoveryListener(this.socket, this.group, this.interfaceName, nodeService));
+        this.listener = new Thread(new DiscoveryListener(this.socket, this.group, "any", nodeService));
     }
 
     public void start() throws SocketException {
@@ -74,19 +71,20 @@ public class DiscoveryService {
                     Node node;
                     try {
                         node = this.objectMapper.readValue(received, Node.class);
+
+                        // Check if node is already known
+                        if (nodeService.getNode(node.getName()) == null) {
+                            this.logger.info("Discovered new node: {}", node.getName());
+                            nodeService.addNode(node);
+                            nodeService.notifyNodeOfMyAddress(node);
+                        } else {
+                            this.logger.info("Node already known: {}", node.getName());
+                            nodeService.updateNode(node); // We don't update everything
+                        }
                     } catch (JsonProcessingException e) {
                         logger.warn("Failed to parse received message: {}", received);
                         e.printStackTrace();
                         continue;
-                    }
-
-                    // Check if node is already known
-                    if (nodeService.getNode(node.getName()) == null) {
-                        this.logger.info("Discovered new node: " + node.getName());
-                        nodeService.addNode(node);
-                    } else {
-                        this.logger.info("Node already known: " + node.getName());
-                        nodeService.updateNode(node); // We don't update everything
                     }
                 }
             } catch (Exception e) {

@@ -8,6 +8,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.TreeMap;
 
@@ -17,6 +18,8 @@ public class InfoService {
     private int previousID;
     private int nextID;
     private Node selfNode;
+    private InetSocketAddress namingServerAddress;
+
     private final TreeMap<Integer, Node> nodes = new TreeMap<>();
     private final Logger logger = LoggerFactory.getLogger(AnnouncingService.class);
 
@@ -39,6 +42,16 @@ public class InfoService {
 
     public int getNextID() {
         return nextID;
+    }
+
+    public String getNamingServerAddress() {
+        if (namingServerAddress == null) return null;
+
+        return "http://" + namingServerAddress.getHostString() + ":" + namingServerAddress.getPort();
+    }
+
+    public void setNamingServerAddress(InetSocketAddress namingServerAddress) {
+        this.namingServerAddress = namingServerAddress;
     }
 
     public TreeMap<Integer, Node> getNodes() {

@@ -4,17 +4,25 @@ import be.uantwerpen.namingserver.models.Node;
 import be.uantwerpen.namingserver.utils.HashingFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.env.Environment;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.web.client.RestClient;
+
 import java.io.File;
 import java.io.IOException;
 
+import java.net.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 @Service
 public class NodeService {
@@ -22,6 +30,22 @@ public class NodeService {
     private final HashMap<Integer, Node> nodes = new HashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Logger logger = LoggerFactory.getLogger(NodeService.class);
+    private final Map<String, String> announceNamingServerBody = new HashMap<>();
+
+    public NodeService(Environment env) throws SocketException, UnknownHostException {
+        // Get the address of the interface
+        NetworkInterface netIf = NetworkInterface.getByName(env.getProperty("app.interface", "lo"));
+        InetAddress inetAddress = netIf.getInterfaceAddresses().stream()
+                .map(InterfaceAddress::getAddress)
+                .filter(address -> address instanceof Inet4Address)
+                .findFirst()
+                .orElseThrow(() -> new UnknownHostException("No IPv4 address found on interface " + netIf.getName()));
+        String port = env.getProperty("server.port", "8080");
+        logger.info("Selected interface {} using address {} and port {}", netIf.getName(), inetAddress.getHostAddress(), port);
+
+        announceNamingServerBody.put("address", inetAddress.getHostAddress());
+        announceNamingServerBody.put("port", port);
+    }
 
     public int getNumberOfNodes() {
         return nodes.size();
@@ -110,6 +134,22 @@ public class NodeService {
         if (node.isLeaving()) {
             oldNode.setLeaving();
         }
+    }
+
+    public void notifyNodeOfMyAddress(Node node) {
+        // Do an HTTP POST request to the node
+        RestClient customClient = RestClient.builder()
+                .baseUrl("http://" + node.getSocketAddress() + "/nodes/server")
+                .build();;
+
+        ResponseEntity<Void> response = customClient.patch()
+                .contentType(APPLICATION_JSON)
+                .body(announceNamingServerBody)
+                .retrieve()
+                .onStatus(status -> !status.is2xxSuccessful(), (request, resp) -> logger.error("Failed to notify node {} of my address, status code {}", node.getName(), resp.getStatusCode()))
+                .toBodilessEntity();
+
+        logger.info("Notified node {} of my address", node.getName());
     }
 
     /**
