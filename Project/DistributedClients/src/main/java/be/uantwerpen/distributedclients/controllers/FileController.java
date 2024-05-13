@@ -26,6 +26,7 @@ public class FileController {
                                    RedirectAttributes redirectAttributes) throws IOException {
 
         fileService.store(file);
+        System.out.println("storing file");
         redirectAttributes.addFlashAttribute("message",
                 "You successfully uploaded " + file.getOriginalFilename() + "!");
 
