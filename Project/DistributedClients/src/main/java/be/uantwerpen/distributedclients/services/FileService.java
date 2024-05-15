@@ -126,17 +126,10 @@ public class FileService {
                 // Get the filename
                 String fileName = localFiles.get(fileHash).getName();
                 // Send delete request
-                // Set up parameters
-                Map<String, String> params = new HashMap<>();
-                params.put("filename", fileName);
-                // Make the DELETE request
-                ResponseEntity<Void> response = restTemplate.exchange(
-                        "http://" + nodeAddress + "/files/replication",
-                        HttpMethod.DELETE,
-                        null,
-                        Void.class,
-                        params
-                );
+                RestClient client = RestClient.builder()
+                        .baseUrl("http://" + nodeAddress + "/files/replciation/" + fileName)
+                        .build();
+                client.method(HttpMethod.DELETE).retrieve();
             }
         }
     }
