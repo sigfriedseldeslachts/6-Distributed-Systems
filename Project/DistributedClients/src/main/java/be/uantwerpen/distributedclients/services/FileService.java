@@ -22,10 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -36,27 +33,29 @@ public class FileService {
     private final Logger logger = LoggerFactory.getLogger(FileService.class);
     private final InfoService infoService;
     private final HashMap<Integer, File> fileList = new HashMap<>();
-    private final HashMap<Integer, File> localFiles = new HashMap<>();
     private Map<Integer, Integer> nodesToStoreFilesOn = new HashMap<>();
     private final RestTemplate restTemplate;
-    private final String dataPath;
+    private final String replicatedFilesPath;
+    private final String localFilesPath;
+    private File[] allLocalFiles;
 
     public FileService(InfoService infoService, Environment env, RestClient.Builder restClientBuilder) {
         this.infoService = infoService;
-        this.dataPath = env.getProperty("app.directory");
+        this.replicatedFilesPath = env.getProperty("app.replicateddirectory");
+        this.localFilesPath = env.getProperty("app.localdirectory");
         this.restTemplate = new RestTemplateBuilder().build();
 
-        if (this.dataPath == null) {
+        if (this.replicatedFilesPath == null) {
             throw new IllegalArgumentException("app.directory is not set in application.properties");
         }
 
         // Create directory if it does not exist
-        File directory = new File(this.dataPath);
+        File directory = new File(this.replicatedFilesPath);
         if (!directory.exists()) {
             if (directory.mkdirs()) {
-                logger.info("Created directory: {}", this.dataPath);
+                logger.info("Created directory: {}", this.replicatedFilesPath);
             } else {
-                logger.error("Failed to create directory: {}", this.dataPath);
+                logger.error("Failed to create directory: {}", this.replicatedFilesPath);
             }
         }
     }
@@ -79,8 +78,6 @@ public class FileService {
         for (Integer hashFile : nodesToStoreFilesOn.keySet()) {
             int node = nodesToStoreFilesOn.get(hashFile);
             if (node == infoService.getSelfNode().hashCode()) {
-                // Put all local files into one hashmap
-                localFiles.put(hashFile, fileList.get(hashFile));
                 continue;
             }
 
@@ -111,33 +108,37 @@ public class FileService {
     @Async
     @Scheduled(fixedRate = 5000)
     public void update(){
-        File directory = new File(this.dataPath);
-        File[] files = directory.listFiles();
-        if (files != null) {
-            for (File file : files) {
+        File replicatedFilesDirectory = new File(this.replicatedFilesPath);
+        File[] replicatedFiles = replicatedFilesDirectory.listFiles();
+        if (replicatedFiles != null) {
+            for (File file : replicatedFiles) {
                 fileList.put(HashingFunction.getHashFromString(file.getName()), file);
             }
         }
-        // Loop trough local files and see if files got removed by checking it against the current files
-        for (Integer fileHash: localFiles.keySet()) {
-            if (fileList.get(fileHash) == null) {
-                // Get node its saved on
-                String nodeAddress = infoService.getNodes().get(nodesToStoreFilesOn.get(fileHash)).getSocketAddress();
-                // Get the filename
-                String fileName = localFiles.get(fileHash).getName();
-                // Send delete request
-                RestClient client = RestClient.builder()
-                        .baseUrl("http://" + nodeAddress + "/files/replication/")
-                        .build();
-                client.method(HttpMethod.DELETE)
-                        .uri(uriBuilder -> uriBuilder.path(fileName).build()) // Append the file name to the base URL
-                        .retrieve();
+        // Get local files
+        File localFilesDirectory = new File(this.localFilesPath);
+        File[] currentLocalFiles = localFilesDirectory.listFiles();
+        HashSet<File> currentLocalFilesSet = new HashSet<>(Arrays.asList(currentLocalFiles));
+        HashSet<File> allLocalFilesSet = new HashSet<>()(Arrays.asList(allLocalFilesSet));
+        if (allLocalFiles != null) {
+            for (File file: allLocalFiles) {
+                // Check if local file is still there
+                if(!currentLocalFilesSet.contains(file)) {
+                    // Remove file on other nodes
+                    // Get filehash
+                    Integer fileHash = HashingFunction.getHashFromString(file.getName());
+                    // Get node its saved on
+                    String nodeAddress = infoService.getNodes().get(nodesToStoreFilesOn.get(fileHash)).getSocketAddress();
+                    // Do delete request
+                }
             }
         }
+        // Update all local files
+        allLocalFiles = localFilesDirectory.listFiles();
     }
 
     public void store(MultipartFile file) throws IOException {
-        File targetFile = new File(this.dataPath, Objects.requireNonNull(file.getOriginalFilename()));
+        File targetFile = new File(this.replicatedFilesPath, Objects.requireNonNull(file.getOriginalFilename()));
         logger.info("Storing file: {}", targetFile.getAbsoluteFile());
 
         InputStream initialStream = file.getInputStream();
@@ -156,7 +157,7 @@ public class FileService {
         Integer fileHash = HashingFunction.getHashFromString(fileName);
         fileList.remove(fileHash);
         // Remove file from directory
-        File fileToRemove = new File(this.dataPath, fileName);
+        File fileToRemove = new File(this.replicatedFilesPath, fileName);
         // Check if the file exists
         if (fileToRemove.exists()) {
             // Attempt to delete the file
