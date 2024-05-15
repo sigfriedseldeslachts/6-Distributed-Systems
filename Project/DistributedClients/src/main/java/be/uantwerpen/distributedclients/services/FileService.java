@@ -127,9 +127,11 @@ public class FileService {
                 String fileName = localFiles.get(fileHash).getName();
                 // Send delete request
                 RestClient client = RestClient.builder()
-                        .baseUrl("http://" + nodeAddress + "/files/replciation/" + fileName)
+                        .baseUrl("http://" + nodeAddress + "/files/replication/")
                         .build();
-                client.method(HttpMethod.DELETE).retrieve();
+                client.method(HttpMethod.DELETE)
+                        .uri(uriBuilder -> uriBuilder.path(fileName).build()) // Append the file name to the base URL
+                        .retrieve();
             }
         }
     }
