@@ -119,7 +119,6 @@ public class FileService {
         File localFilesDirectory = new File(this.localFilesPath);
         File[] currentLocalFiles = localFilesDirectory.listFiles();
         HashSet<File> currentLocalFilesSet = new HashSet<>(Arrays.asList(currentLocalFiles));
-        HashSet<File> allLocalFilesSet = new HashSet<>()(Arrays.asList(allLocalFilesSet));
         if (allLocalFiles != null) {
             for (File file: allLocalFiles) {
                 // Check if local file is still there
