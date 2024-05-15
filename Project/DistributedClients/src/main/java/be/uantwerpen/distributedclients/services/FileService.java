@@ -36,6 +36,8 @@ public class FileService {
     private final Logger logger = LoggerFactory.getLogger(FileService.class);
     private final InfoService infoService;
     private final HashMap<Integer, File> fileList = new HashMap<>();
+    private final HashMap<Integer, File> localFiles = new HashMap<>();
+    private Map<Integer, Integer> nodesToStoreFilesOn = new HashMap<>();
     private final RestTemplate restTemplate;
     private final String dataPath;
 
@@ -70,11 +72,15 @@ public class FileService {
                 .baseUrl(infoService.getNamingServerAddress() + "/files/replication")
                 .defaultHeader("Content-Type", "application/json")
                 .build();
-        Map<Integer, Integer> map = client.method(HttpMethod.POST).body(new ArrayList<>(fileList.keySet())).retrieve().body(new ParameterizedTypeReference<>() {});
+        //Map<Integer, Integer> map = client.method(HttpMethod.POST).body(new ArrayList<>(fileList.keySet())).retrieve().body(new ParameterizedTypeReference<>() {});
+        nodesToStoreFilesOn = client.method(HttpMethod.POST).body(new ArrayList<>(fileList.keySet())).retrieve().body(new ParameterizedTypeReference<>() {});
 
-        for (Integer hashFile : map.keySet()) {
-            int node = map.get(hashFile);
+
+        for (Integer hashFile : nodesToStoreFilesOn.keySet()) {
+            int node = nodesToStoreFilesOn.get(hashFile);
             if (node == infoService.getSelfNode().hashCode()) {
+                // Put all local files into one hashmap
+                localFiles.put(hashFile, fileList.get(hashFile));
                 continue;
             }
 
@@ -112,6 +118,27 @@ public class FileService {
                 fileList.put(HashingFunction.getHashFromString(file.getName()), file);
             }
         }
+        // Loop trough local files and see if files got removed by checking it against the current files
+        for (Integer fileHash: localFiles.keySet()) {
+            if (fileList.get(fileHash) == null) {
+                // Get node its saved on
+                String nodeAddress = infoService.getNodes().get(nodesToStoreFilesOn.get(fileHash)).getSocketAddress();
+                // Get the filename
+                String fileName = localFiles.get(fileHash).getName();
+                // Send delete request
+                // Set up parameters
+                Map<String, String> params = new HashMap<>();
+                params.put("filename", fileName);
+                // Make the DELETE request
+                ResponseEntity<Void> response = restTemplate.exchange(
+                        "http://" + nodeAddress + "/files/replication",
+                        HttpMethod.DELETE,
+                        null,
+                        Void.class,
+                        params
+                );
+            }
+        }
     }
 
     public void store(MultipartFile file) throws IOException {
@@ -127,6 +154,26 @@ public class FileService {
         } catch (Exception e) {
             logger.error("Failed to store file: {}", e.getMessage());
             e.printStackTrace();
+        }
+    }
+    public void remove(String fileName) {
+        // Remove file from file list
+        Integer fileHash = HashingFunction.getHashFromString(fileName);
+        fileList.remove(fileHash);
+        // Remove file from directory
+        File fileToRemove = new File(this.dataPath, fileName);
+        // Check if the file exists
+        if (fileToRemove.exists()) {
+            // Attempt to delete the file
+            boolean isDeleted = fileToRemove.delete();
+            // Check if the file was successfully deleted
+            if (isDeleted) {
+                System.out.println("File " + fileName + " has been successfully deleted.");
+            } else {
+                System.out.println("Failed to delete file " + fileName + ".");
+            }
+        } else {
+            System.out.println("File " + fileName + " does not exist in the specified directory.");
         }
     }
 }

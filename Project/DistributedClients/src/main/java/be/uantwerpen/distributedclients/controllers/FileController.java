@@ -24,4 +24,9 @@ public class FileController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/replication")
+    public ResponseEntity<Object> removeFile(@RequestParam("filename") String fileName) throws IOException {
+        fileService.remove(fileName);
+        return ResponseEntity.noContent().build();
+    }
 }
