@@ -24,6 +24,7 @@ import org.springframework.boot.web.client.RestTemplateBuilder;
 
 import java.io.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @EnableAsync
@@ -35,7 +36,7 @@ public class FileService {
     private final RestTemplate restTemplate;
     private final String replicatedFilesPath;
     private final String localFilesPath;
-    private File[] previousLocalFiles;
+    private Set<String> previousLocalFiles = new HashSet<>();
 
     public FileService(InfoService infoService, Environment env, RestClient.Builder restClientBuilder) {
         this.infoService = infoService;
@@ -65,7 +66,7 @@ public class FileService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add("file", new FileSystemResource(file));
+        body.add("file", new FileSystemResource(file.getAbsolutePath()));
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
         return restTemplate.exchange(
@@ -79,13 +80,22 @@ public class FileService {
     /**
      * de http request om een file te verwijderen die gekopieerd staat op een andere node
      */
-    public ResponseEntity<String> deleteRequest(int fileHash, String nodeAddress) {
-        return restTemplate.exchange(
+    public void deleteRequest(String fileName) {
+        int fileHash = HashingFunction.getHashFromString(fileName);
+        String nodeAddress = infoService.getNodes().get(nodesToStoreFilesOn.get(fileHash)).getSocketAddress();
+
+        ResponseEntity<Object> response = restTemplate.exchange(
                 "http://" + nodeAddress + "/files/replication/" + fileList.get(fileHash).getName(),
                 HttpMethod.DELETE,
                 null,
-                String.class
+                Object.class
         );
+
+        if (response.getStatusCode() == HttpStatus.OK) {
+            logger.debug("File deleted successfully: {}", fileName);
+        } else {
+            logger.debug("Failed to delete file. Status code: {}. File name: {}", response.getStatusCode(), fileName);
+        }
     }
 
     /**
@@ -127,53 +137,22 @@ public class FileService {
     @Async
     @Scheduled(fixedRate = 5000)
     public void update() {
-        /*
-        File replicatedFilesDirectory = new File(this.replicatedFilesPath);
-        File[] replicatedFiles = replicatedFilesDirectory.listFiles();
-        if (replicatedFiles != null) {
-            for (File file : replicatedFiles) {
-                fileList.put(HashingFunction.getHashFromString(file.getName()), file);
-            }
-        }*/
-
         // Updates list of new local files
-        File localFilesDirectory = new File(this.localFilesPath);
-        File[] currentLocalFiles = localFilesDirectory.listFiles();
-        HashSet<File> currentLocalFilesSet = new HashSet<>(Arrays.asList(currentLocalFiles));
-        HashSet<File> previousLocalFilesSet = new HashSet<>(Arrays.asList(previousLocalFiles));
-        if (currentLocalFiles != null) {
-            for (File currentFile : currentLocalFiles) {
-                // Check if local file is still there
-                if (!previousLocalFilesSet.contains(currentFile)) {
-                    fileList.put(HashingFunction.getHashFromString(currentFile.getName()), currentFile);
-                }
-            }
+        Set<String> currentLocalFiles = this.getFilesInPathAsSet(this.localFilesPath);
+
+        for (String fileName : currentLocalFiles) {
+            fileList.put(HashingFunction.getHashFromString(fileName), new File(this.localFilesPath, fileName));
         }
 
-        // updates list for deleted files
-        if (previousLocalFiles != null) {
-            for (File file : previousLocalFiles) {
-                // Check if local file is still there
-                if (!currentLocalFilesSet.contains(file)) {
-                    // Remove file on other nodes
-                    // Get filehash
-                    int fileHash = HashingFunction.getHashFromString(file.getName());
-                    // Get node its saved on
-                    String nodeAddress = infoService.getNodes().get(nodesToStoreFilesOn.get(fileHash)).getSocketAddress();
-                    // Do delete request
-                    ResponseEntity<String> responseEntity = deleteRequest(fileHash, nodeAddress);
-
-                    if (responseEntity.getStatusCode() == HttpStatus.OK) {
-                        logger.debug("File deleted successfully: {}", file.getName());
-                    } else {
-                        logger.debug("Failed to delete file. Status code: {}. File name: {}", responseEntity.getStatusCode(), file.getName());
-                    }
-                }
+        for (String fileName : previousLocalFiles) {
+            // Check if local file is still there
+            if (!currentLocalFiles.contains(fileName)) {
+                deleteRequest(fileName);
             }
         }
 
         // Update all local files
-        previousLocalFiles = localFilesDirectory.listFiles();
+        previousLocalFiles = currentLocalFiles;
     }
 
     public void store(MultipartFile file) throws IOException {
@@ -201,9 +180,8 @@ public class FileService {
         // Check if the file exists
         if (fileToRemove.exists()) {
             // Attempt to delete the file
-            boolean isDeleted = fileToRemove.delete();
             // Check if the file was successfully deleted
-            if (isDeleted) {
+            if (fileToRemove.delete()) {
                 System.out.println("File " + fileName + " has been successfully deleted.");
             } else {
                 System.out.println("Failed to delete file " + fileName + ".");
@@ -216,24 +194,34 @@ public class FileService {
 
     @PreDestroy
     public void destroy() {
-        List<File> localList = Arrays.asList(previousLocalFiles);
+        Set<String> localList = this.getFilesInPathAsSet(this.localFilesPath);
+        Set<String> replicatedList = this.getFilesInPathAsSet(this.replicatedFilesPath);
 
-        for (File file : fileList.values()) {
-            // if local file -> tell copied node to destroy copies
-            if (localList.contains(file)) {
-                int fileHash = HashingFunction.getHashFromString(file.getName());
-                ResponseEntity<String> responseEntity = deleteRequest(fileHash, infoService.getNodes().get(nodesToStoreFilesOn.get(fileHash)).getSocketAddress());
-                if (responseEntity.getStatusCode() == HttpStatus.OK) {
-                    logger.debug("File deleted successfully: {}", file.getName());
-                } else {
-                    logger.debug("Failed to delete file. Status code: {}. File name: {}", responseEntity.getStatusCode(), file.getName());
-                }
-                return;
-            }
+        for (String fileName : localList) {
+            deleteRequest(fileName);
+        }
+
+        for (String fileName : replicatedList) {
+            File file = new File(this.replicatedFilesPath, fileName);
+
             // copy to this previous through a simple http request
-            transferRequest(file, this.infoService.getNodes().get(this.infoService.getPreviousID()).getSocketAddress());
+            ResponseEntity<String> responseEntity = transferRequest(file, this.infoService.getNodes().get(this.infoService.getPreviousID()).getSocketAddress());
 
+            if (responseEntity.getStatusCode() == HttpStatus.OK) {
+                logger.debug("File transfered successfully: {}", file.getName());
+            } else {
+                logger.debug("Failed to transfer file. Status code: {}. File name: {}", responseEntity.getStatusCode(), file.getName());
+            }
             //TODO: figure out how to check if the previous node of this one is the owner of the copied file
         }
+    }
+
+    private Set<String> getFilesInPathAsSet(String path) {
+        File dir = new File(path);
+        if (!dir.exists() || !dir.isDirectory()) {
+            return Collections.emptySet();
+        }
+
+        return Arrays.stream(dir.listFiles()).map(File::getName).collect(Collectors.toSet());
     }
 }
