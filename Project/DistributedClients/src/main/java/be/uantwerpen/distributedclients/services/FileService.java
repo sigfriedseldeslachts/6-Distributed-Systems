@@ -62,19 +62,25 @@ public class FileService {
     /**
      * de http request om file te transferen en kopieren op andere node
      */
-    public ResponseEntity<String> transferRequest(File file, String nodeAddress) {
+    public void transferRequest(File file, String nodeAddress) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("file", new FileSystemResource(file.getAbsolutePath()));
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
-        return restTemplate.exchange(
+        ResponseEntity<String> responseEntity =  restTemplate.exchange(
                 "http://" + nodeAddress + "/files/replication",
                 HttpMethod.POST,
                 requestEntity,
                 String.class
         );
+
+        if (responseEntity.getStatusCode() == HttpStatus.OK) {
+            logger.debug("File transfered successfully: {}", file.getName());
+        } else {
+            logger.debug("Failed to transfer file. Status code: {}. File name: {}", responseEntity.getStatusCode(), file.getName());
+        }
     }
 
     /**
@@ -123,13 +129,7 @@ public class FileService {
 
             String nodeAddress = infoService.getNodes().get(node).getSocketAddress();
             File file = fileList.get(hashFile);
-            ResponseEntity<String> responseEntity = transferRequest(file, nodeAddress);
-
-            if (responseEntity.getStatusCode() == HttpStatus.OK) {
-                logger.debug("File uploaded successfully: {}", file.getName());
-            } else {
-                logger.debug("Failed to upload file. Status code: {}. File name: {}", responseEntity.getStatusCode(), file.getName());
-            }
+            transferRequest(file, nodeAddress);
         }
 
     }
@@ -156,6 +156,7 @@ public class FileService {
     }
 
     public void store(MultipartFile file) throws IOException {
+        //TODO: adding file adds weird name to directory
         File targetFile = new File(this.replicatedFilesPath, Objects.requireNonNull(file.getOriginalFilename()));
         logger.info("Storing file: {}", targetFile.getAbsoluteFile());
 
@@ -205,13 +206,8 @@ public class FileService {
             File file = new File(this.replicatedFilesPath, fileName);
 
             // copy to this previous through a simple http request
-            ResponseEntity<String> responseEntity = transferRequest(file, this.infoService.getNodes().get(this.infoService.getPreviousID()).getSocketAddress());
+            transferRequest(file, this.infoService.getNodes().get(this.infoService.getPreviousID()).getSocketAddress());
 
-            if (responseEntity.getStatusCode() == HttpStatus.OK) {
-                logger.debug("File transfered successfully: {}", file.getName());
-            } else {
-                logger.debug("Failed to transfer file. Status code: {}. File name: {}", responseEntity.getStatusCode(), file.getName());
-            }
             //TODO: figure out how to check if the previous node of this one is the owner of the copied file
         }
     }
