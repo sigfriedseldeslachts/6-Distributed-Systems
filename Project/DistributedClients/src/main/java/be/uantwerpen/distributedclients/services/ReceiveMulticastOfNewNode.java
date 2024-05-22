@@ -59,9 +59,14 @@ public class ReceiveMulticastOfNewNode {
                     String received = new String(packet.getData(), 0, packet.getLength());
 
                     // Parse the node
-                    Node node = null;
+                    Node node;
                     try {
                         node = this.objectMapper.readValue(received, Node.class);
+
+                        if (!this.infoService.getNodes().containsKey(node.hashCode())) {
+                            this.fileService.clearPreviousLocalFiles();
+                        }
+
                         // Make sure the node is not the current node
                         if (node.hashCode() != this.infoService.getSelfNode().hashCode()) {
                             node.setLastPing(LocalDateTime.now());
@@ -69,10 +74,9 @@ public class ReceiveMulticastOfNewNode {
                             logger.info("Message received, added/updated node: {}", received);
                         }
 
+
                         // Update the order of the nodes
                         this.infoService.updateNodeOrder();
-
-                        this.fileService.send();
                     } catch (Exception e) {
                         logger.warn("Failed to parse received message: {}", received);
                         e.printStackTrace();

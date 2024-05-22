@@ -63,6 +63,8 @@ public class FileService {
      * de http request om file te transferen en kopieren op andere node
      */
     public void transferRequest(File file, String nodeAddress) {
+        logger.info("Transferring file: {}", file.getName());
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
@@ -104,34 +106,9 @@ public class FileService {
         }
     }
 
-    /**
-     * dit is de node die zijn request stuurt naar de receiving node
-     */
-    public void send() {
-        if (infoService.getNamingServerAddress() == null) {
-            logger.warn("Naming server address is still not known. Skipping file replication");
-            return;
-        }
-
-        // send a request to namingserver to get info on who to connect to
-        RestClient client = RestClient.builder()
-                .baseUrl(infoService.getNamingServerAddress() + "/files/replication")
-                .defaultHeader("Content-Type", "application/json")
-                .build();
-        nodesToStoreFilesOn = client.method(HttpMethod.POST).body(new ArrayList<>(fileList.keySet())).retrieve().body(new ParameterizedTypeReference<>() {});
-
-        // send a request to connecting node
-        for (Integer hashFile : nodesToStoreFilesOn.keySet()) {
-            int node = nodesToStoreFilesOn.get(hashFile);
-            if (node == infoService.getSelfNode().hashCode()) {
-                continue;
-            }
-
-            String nodeAddress = infoService.getNodes().get(node).getSocketAddress();
-            File file = fileList.get(hashFile);
-            transferRequest(file, nodeAddress);
-        }
-
+    public void clearPreviousLocalFiles() {
+        previousLocalFiles = new HashSet<>();
+        previousLocalFiles = new HashSet<>();
     }
 
     @Async
@@ -139,10 +116,8 @@ public class FileService {
     public void update() {
         // Updates list of new local files
         Set<String> currentLocalFiles = this.getFilesInPathAsSet(this.localFilesPath);
-
-        for (String fileName : currentLocalFiles) {
-            fileList.put(HashingFunction.getHashFromString(fileName), new File(this.localFilesPath, fileName));
-        }
+        Set<String> newFileSet = new HashSet<>(currentLocalFiles); // We need an unchanged file set for using it in next checks!
+        newFileSet.removeAll(previousLocalFiles); // Removes
 
         for (String fileName : previousLocalFiles) {
             // Check if local file is still there
@@ -153,11 +128,40 @@ public class FileService {
 
         // Update all local files
         previousLocalFiles = currentLocalFiles;
+        if (newFileSet.isEmpty()) return;
+        if (infoService.getNamingServerAddress() == null) {
+            logger.warn("Naming server address is still not known. Skipping file replication");
+            return;
+        }
+
+        // Create the file list
+        fileList.clear();
+        for (String fileName : newFileSet) {
+            fileList.put(HashingFunction.getHashFromString(fileName), new File(this.localFilesPath, fileName));
+        }
+
+        // Send to naming server
+        RestClient client = RestClient.builder()
+                .baseUrl(infoService.getNamingServerAddress() + "/files/replication")
+                .defaultHeader("Content-Type", "application/json")
+                .build();
+        nodesToStoreFilesOn = client.method(HttpMethod.POST).body(new ArrayList<>(fileList.keySet())).retrieve().body(new ParameterizedTypeReference<>() {});
+
+        for (Integer hashFile : nodesToStoreFilesOn.keySet()) {
+            int node = nodesToStoreFilesOn.get(hashFile);
+            if (node == infoService.getSelfNode().hashCode()) {
+                continue;
+            }
+
+            String nodeAddress = infoService.getNodes().get(node).getSocketAddress();
+            File file = fileList.get(hashFile);
+            transferRequest(file, nodeAddress);
+        }
     }
 
     public void store(MultipartFile file) throws IOException {
         //TODO: adding file adds weird name to directory
-        File targetFile = new File(this.replicatedFilesPath, Objects.requireNonNull(file.getOriginalFilename()));
+        File targetFile = new File(this.replicatedFilesPath, file.getOriginalFilename());
         logger.info("Storing file: {}", targetFile.getAbsoluteFile());
 
         InputStream initialStream = file.getInputStream();
@@ -170,6 +174,7 @@ public class FileService {
             logger.error("Failed to store file: {}", e.getMessage());
             e.printStackTrace();
         }
+        initialStream.close();
     }
 
     public void remove(String fileName) {
