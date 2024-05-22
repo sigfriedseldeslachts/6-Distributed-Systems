@@ -5,7 +5,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
 
 @RestController
 @RequestMapping("/files")
@@ -17,10 +20,14 @@ public class FileController {
         this.fileService = fileService;
     }
 
+    @GetMapping("/list")
+    public HashMap<Integer, File> getFiles() {
+        return this.fileService.getFileList();
+    }
+
     // dit is wat de receiving node moet doen
     @PostMapping("/replication")
     public ResponseEntity<Object> handleFileUpload(@RequestParam("file") MultipartFile file) throws IOException {
-        System.out.println("BLAAAAAAAAAAAAAAAAAAAAA RECEIVING FILE");
         fileService.store(file);
         return ResponseEntity.noContent().build();
     }

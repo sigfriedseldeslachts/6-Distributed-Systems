@@ -34,29 +34,24 @@ public class FileService {
     private final HashMap<Integer, File> fileList = new HashMap<>();
     private Map<Integer, Integer> nodesToStoreFilesOn = new HashMap<>();
     private final RestTemplate restTemplate;
-    private final String replicatedFilesPath;
-    private final String localFilesPath;
+    private final File replicatedFilesDirectory;
+    private final File localFilesDirectory;
     private Set<String> previousLocalFiles = new HashSet<>();
 
     public FileService(InfoService infoService, Environment env, RestClient.Builder restClientBuilder) {
-        this.infoService = infoService;
-        this.replicatedFilesPath = env.getProperty("app.replicateddirectory");
-        this.localFilesPath = env.getProperty("app.localdirectory");
-        this.restTemplate = new RestTemplateBuilder().build();
-
-        if (this.replicatedFilesPath == null) {
+        String defaultDirectory = env.getProperty("app.directory", "");
+        if (defaultDirectory.isEmpty()) {
             throw new IllegalArgumentException("app.directory is not set in application.properties");
         }
 
-        // Create directory if it does not exist
-        File directory = new File(this.replicatedFilesPath);
-        if (!directory.exists()) {
-            if (directory.mkdirs()) {
-                logger.info("Created directory: {}", this.replicatedFilesPath);
-            } else {
-                logger.error("Failed to create directory: {}", this.replicatedFilesPath);
-            }
-        }
+        this.infoService = infoService;
+        this.replicatedFilesDirectory = new File(defaultDirectory, "replicated");
+        this.localFilesDirectory = new File(defaultDirectory, "local");
+        this.restTemplate = new RestTemplateBuilder().build();
+
+        // Create directories
+        this.createDirectory(replicatedFilesDirectory);
+        this.createDirectory(localFilesDirectory);
     }
 
     /**
@@ -108,14 +103,13 @@ public class FileService {
 
     public void clearPreviousLocalFiles() {
         previousLocalFiles = new HashSet<>();
-        previousLocalFiles = new HashSet<>();
     }
 
     @Async
     @Scheduled(fixedRate = 5000)
     public void update() {
         // Updates list of new local files
-        Set<String> currentLocalFiles = this.getFilesInPathAsSet(this.localFilesPath);
+        Set<String> currentLocalFiles = this.getFilesInDirAsSet(this.localFilesDirectory);
         Set<String> newFileSet = new HashSet<>(currentLocalFiles); // We need an unchanged file set for using it in next checks!
         newFileSet.removeAll(previousLocalFiles); // Removes
 
@@ -126,18 +120,19 @@ public class FileService {
             }
         }
 
-        // Update all local files
-        previousLocalFiles = currentLocalFiles;
-        if (newFileSet.isEmpty()) return;
         if (infoService.getNamingServerAddress() == null) {
             logger.warn("Naming server address is still not known. Skipping file replication");
             return;
         }
 
+        // Update all local files
+        previousLocalFiles = currentLocalFiles;
+        if (newFileSet.isEmpty()) return;
+
         // Create the file list
         fileList.clear();
         for (String fileName : newFileSet) {
-            fileList.put(HashingFunction.getHashFromString(fileName), new File(this.localFilesPath, fileName));
+            fileList.put(HashingFunction.getHashFromString(fileName), new File(this.localFilesDirectory, fileName));
         }
 
         // Send to naming server
@@ -160,8 +155,8 @@ public class FileService {
     }
 
     public void store(MultipartFile file) throws IOException {
-        //TODO: adding file adds weird name to directory
-        File targetFile = new File(this.replicatedFilesPath, file.getOriginalFilename());
+        // TODO: adding file adds weird name to directory -> CANNOT REPRODUCE?!
+        File targetFile = new File(this.replicatedFilesDirectory, file.getOriginalFilename());
         logger.info("Storing file: {}", targetFile.getAbsoluteFile());
 
         InputStream initialStream = file.getInputStream();
@@ -182,7 +177,7 @@ public class FileService {
         Integer fileHash = HashingFunction.getHashFromString(fileName);
         fileList.remove(fileHash);
         // Remove file from directory
-        File fileToRemove = new File(this.replicatedFilesPath, fileName);
+        File fileToRemove = new File(this.replicatedFilesDirectory, fileName);
         // Check if the file exists
         if (fileToRemove.exists()) {
             // Attempt to delete the file
@@ -200,29 +195,48 @@ public class FileService {
 
     @PreDestroy
     public void destroy() {
-        Set<String> localList = this.getFilesInPathAsSet(this.localFilesPath);
-        Set<String> replicatedList = this.getFilesInPathAsSet(this.replicatedFilesPath);
+        Set<String> localList = this.getFilesInDirAsSet(this.localFilesDirectory);
+        Set<String> replicatedList = this.getFilesInDirAsSet(this.replicatedFilesDirectory);
 
         for (String fileName : localList) {
             deleteRequest(fileName);
         }
 
         for (String fileName : replicatedList) {
-            File file = new File(this.replicatedFilesPath, fileName);
+            File file = new File(this.replicatedFilesDirectory, fileName);
 
-            // copy to this previous through a simple http request
+            // Copy to this previous through a simple http request
             transferRequest(file, this.infoService.getNodes().get(this.infoService.getPreviousID()).getSocketAddress());
 
-            //TODO: figure out how to check if the previous node of this one is the owner of the copied file
+            // TODO: figure out how to check if the previous node of this one is the owner of the copied file
         }
     }
 
-    private Set<String> getFilesInPathAsSet(String path) {
-        File dir = new File(path);
+    private Set<String> getFilesInDirAsSet(File dir) {
         if (!dir.exists() || !dir.isDirectory()) {
             return Collections.emptySet();
         }
 
         return Arrays.stream(dir.listFiles()).map(File::getName).collect(Collectors.toSet());
+    }
+
+    private boolean createDirectory(File path) {
+        if (!path.exists()) {
+            boolean success = path.mkdirs();
+
+            if (success) {
+                logger.info("Created directory: {}", path);
+            } else {
+                logger.error("Failed to create directory: {}", path);
+            }
+
+            return success;
+        }
+
+        return true;
+    }
+
+    public HashMap<Integer, File> getFileList() {
+        return fileList;
     }
 }

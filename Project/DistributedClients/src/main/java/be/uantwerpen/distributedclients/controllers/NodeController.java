@@ -2,6 +2,8 @@ package be.uantwerpen.distributedclients.controllers;
 
 import be.uantwerpen.distributedclients.services.InfoService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.InetSocketAddress;
@@ -13,6 +15,7 @@ import java.util.Map;
 public class NodeController {
 
     private final InfoService infoservice;
+    private final Logger logger = LoggerFactory.getLogger(NodeController.class);
 
     public NodeController(InfoService infoservice) {
         this.infoservice = infoservice;
@@ -42,6 +45,6 @@ public class NodeController {
         InetSocketAddress address = InetSocketAddress.createUnresolved(body.get("address"), Integer.parseInt(body.get("port")));
         this.infoservice.setNamingServerAddress(address);
 
-        System.out.println("Updated naming server address to " + address);
+        logger.debug("Updating naming server address to: {}", infoservice.getNamingServerAddress());
     }
 }
