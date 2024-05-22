@@ -72,6 +72,22 @@ public class DiscoveryService {
                     try {
                         node = this.objectMapper.readValue(received, Node.class);
 
+                        // If the node is leaving
+                        if (node.isLeaving()) {
+                            Node leavingNode = nodeService.getNode(node.getName());
+
+                            // And it's not found in our node list
+                            // Or when the state is already set to leaving
+                            // Then we do nothing
+                            if (leavingNode == null || leavingNode.isLeaving()) {
+                                continue;
+                            }
+
+                            // Update the node and continue, we only want to do this ONCE!
+                            nodeService.updateNode(node);
+                            continue;
+                        }
+
                         // Check if node is already known
                         if (nodeService.getNode(node.getName()) == null) {
                             this.logger.info("Discovered new node: {}", node.getName());
@@ -83,12 +99,13 @@ public class DiscoveryService {
                         }
                     } catch (JsonProcessingException e) {
                         logger.warn("Failed to parse received message: {}", received);
+                    } catch (Exception e) { // We catch any other errors to prevent our loop from running
+                        logger.error("Failed executing node service: {}", e.getMessage());
                         e.printStackTrace();
-                        continue;
                     }
                 }
             } catch (Exception e) {
-                logger.error("Failed to listen for incoming messages: " + e.getMessage());
+                logger.error("Failed to listen for incoming messages: {}", e.getMessage());
                 e.printStackTrace();
             }
         }
