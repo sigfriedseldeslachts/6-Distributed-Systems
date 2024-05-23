@@ -63,10 +63,6 @@ public class ReceiveMulticastOfNewNode {
                     try {
                         node = this.objectMapper.readValue(received, Node.class);
 
-                        if (!this.infoService.getNodes().containsKey(node.hashCode())) {
-                            this.fileService.clearPreviousLocalFiles();
-                        }
-
                         // Make sure the node is not the current node
                         if (node.hashCode() != this.infoService.getSelfNode().hashCode()) {
                             node.setLastPing(LocalDateTime.now());

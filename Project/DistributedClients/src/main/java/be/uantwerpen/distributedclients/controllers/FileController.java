@@ -27,8 +27,8 @@ public class FileController {
 
     // dit is wat de receiving node moet doen
     @PostMapping("/replication")
-    public ResponseEntity<Object> handleFileUpload(@RequestParam("file") MultipartFile file) throws IOException {
-        fileService.store(file);
+    public ResponseEntity<Object> handleFileUpload(@RequestParam("file") MultipartFile file, @RequestParam("isLocal") boolean isLocal) throws IOException {
+        fileService.store(file, isLocal);
         return ResponseEntity.noContent().build();
     }
 

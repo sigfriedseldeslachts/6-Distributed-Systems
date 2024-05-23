@@ -31,12 +31,14 @@ import java.util.stream.Collectors;
 public class FileService {
     private final Logger logger = LoggerFactory.getLogger(FileService.class);
     private final InfoService infoService;
-    private final HashMap<Integer, File> fileList = new HashMap<>();
+    private HashMap<Integer, File> fileList = new HashMap<>();
     private Map<Integer, Integer> nodesToStoreFilesOn = new HashMap<>();
     private final RestTemplate restTemplate;
     private final File replicatedFilesDirectory;
     private final File localFilesDirectory;
     private Set<String> previousLocalFiles = new HashSet<>();
+
+    private final HashMap<Integer, Set<Integer>> replicatedFilesToNodes = new HashMap<>(); // Keeps PER file a set of node hashes
 
     public FileService(InfoService infoService, Environment env, RestClient.Builder restClientBuilder) {
         String defaultDirectory = env.getProperty("app.directory", "");
@@ -57,8 +59,8 @@ public class FileService {
     /**
      * de http request om file te transferen en kopieren op andere node
      */
-    public void transferRequest(File file, String nodeAddress) {
-        logger.info("Transferring file: {}", file.getName());
+    public void transferRequest(File file, String nodeAddress, boolean shouldStoreLocally) {
+        logger.info("Transferring file: {} to node: {}", file.getName(), nodeAddress);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
@@ -67,7 +69,7 @@ public class FileService {
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
         ResponseEntity<String> responseEntity =  restTemplate.exchange(
-                "http://" + nodeAddress + "/files/replication",
+                "http://" + nodeAddress + "/files/replication?isLocal=" + shouldStoreLocally,
                 HttpMethod.POST,
                 requestEntity,
                 String.class
@@ -101,13 +103,15 @@ public class FileService {
         }
     }
 
-    public void clearPreviousLocalFiles() {
-        previousLocalFiles = new HashSet<>();
-    }
-
     @Async
     @Scheduled(fixedRate = 5000)
     public void update() {
+        // If we are alone, simply do nothing
+        if (infoService.getNodes().size() <= 1) {
+            return;
+        }
+
+
         // Updates list of new local files
         Set<String> currentLocalFiles = this.getFilesInDirAsSet(this.localFilesDirectory);
         Set<String> newFileSet = new HashSet<>(currentLocalFiles); // We need an unchanged file set for using it in next checks!
@@ -125,15 +129,12 @@ public class FileService {
             return;
         }
 
-        // Update all local files
-        previousLocalFiles = currentLocalFiles;
-        if (newFileSet.isEmpty()) return;
-
         // Create the file list
-        fileList.clear();
+        HashMap<Integer, File> newFileList = new HashMap<>();
         for (String fileName : newFileSet) {
-            fileList.put(HashingFunction.getHashFromString(fileName), new File(this.localFilesDirectory, fileName));
+            newFileList.put(HashingFunction.getHashFromString(fileName), new File(this.localFilesDirectory, fileName));
         }
+        fileList = newFileList;
 
         // Send to naming server
         RestClient client = RestClient.builder()
@@ -142,22 +143,37 @@ public class FileService {
                 .build();
         nodesToStoreFilesOn = client.method(HttpMethod.POST).body(new ArrayList<>(fileList.keySet())).retrieve().body(new ParameterizedTypeReference<>() {});
 
+        // Go over each files
         for (Integer hashFile : nodesToStoreFilesOn.keySet()) {
-            int node = nodesToStoreFilesOn.get(hashFile);
-            if (node == infoService.getSelfNode().hashCode()) {
-                continue;
+            int replicationNode = nodesToStoreFilesOn.get(hashFile); // Get the node that we should replicate to according to the naming server
+            if (replicationNode == infoService.getSelfNode().hashCode()) {
+                replicationNode = infoService.getNextID();
             }
 
-            String nodeAddress = infoService.getNodes().get(node).getSocketAddress();
-            File file = fileList.get(hashFile);
-            transferRequest(file, nodeAddress);
+            Set<Integer> nodesThatWeReplicatedAFileTo = replicatedFilesToNodes.getOrDefault(hashFile, new HashSet<>()); // Keeps track of which file has been replicated to which node
+
+            // If the replication node is already in the Set, we already replicated it and do nothing
+            if (nodesThatWeReplicatedAFileTo.contains(replicationNode)) continue;
+
+            // Otherwise we should replicate
+            transferRequest(
+                    fileList.get(hashFile),
+                    infoService.getNodes().get(replicationNode).getSocketAddress(),
+                    false
+            );
+
+            nodesThatWeReplicatedAFileTo.add(replicationNode); // Add the replication node to it
+
+            replicatedFilesToNodes.put(hashFile, nodesThatWeReplicatedAFileTo);
         }
+
+        // Update all local files
+        previousLocalFiles = currentLocalFiles;
     }
 
-    public void store(MultipartFile file) throws IOException {
-        // TODO: adding file adds weird name to directory -> CANNOT REPRODUCE?!
-        File targetFile = new File(this.replicatedFilesDirectory, file.getOriginalFilename());
-        logger.info("Storing file: {}", targetFile.getAbsoluteFile());
+    public void store(MultipartFile file, boolean isLocal) throws IOException {
+        File targetFile = new File(isLocal ? this.localFilesDirectory : this.replicatedFilesDirectory, file.getOriginalFilename());
+        logger.info("Storing file: {}, Locally?: {}", targetFile.getAbsoluteFile(), isLocal);
 
         InputStream initialStream = file.getInputStream();
         byte[] buffer = new byte[initialStream.available()];
@@ -192,26 +208,34 @@ public class FileService {
         }
     }
 
-
     @PreDestroy
     public void destroy() {
         Set<String> localList = this.getFilesInDirAsSet(this.localFilesDirectory);
         Set<String> replicatedList = this.getFilesInDirAsSet(this.replicatedFilesDirectory);
 
-        for (String fileName : localList) {
-            deleteRequest(fileName);
+        // Do nothing if we are the only node
+        if (this.infoService.getNodes().size() <= 1) {
+            return;
         }
 
+        // When node stops, its own files should be transferred to the previous node
+        for (String fileName : localList) {
+            File file = new File(this.localFilesDirectory, fileName);
+            transferRequest(file, this.infoService.getNodes().get(this.infoService.getPreviousID()).getSocketAddress(), true);
+        }
+
+        //
         for (String fileName : replicatedList) {
             File file = new File(this.replicatedFilesDirectory, fileName);
-
-            // Copy to this previous through a simple http request
-            transferRequest(file, this.infoService.getNodes().get(this.infoService.getPreviousID()).getSocketAddress());
-
-            // TODO: figure out how to check if the previous node of this one is the owner of the copied file
+            transferRequest(file, this.infoService.getNodes().get(this.infoService.getPreviousID()).getSocketAddress(), false);
         }
     }
 
+    /**
+     *
+     * @param dir
+     * @return A set of files in the directory
+     */
     private Set<String> getFilesInDirAsSet(File dir) {
         if (!dir.exists() || !dir.isDirectory()) {
             return Collections.emptySet();
