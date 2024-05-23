@@ -106,35 +106,26 @@ public class FileService {
     @Async
     @Scheduled(fixedRate = 5000)
     public void update() {
-        // If we are alone, simply do nothing
-        if (infoService.getNodes().size() <= 1) {
-            return;
-        }
-
+        logger.info("File list: {}", fileList.size());
 
         // Updates list of new local files
         Set<String> currentLocalFiles = this.getFilesInDirAsSet(this.localFilesDirectory);
-        Set<String> newFileSet = new HashSet<>(currentLocalFiles); // We need an unchanged file set for using it in next checks!
-        newFileSet.removeAll(previousLocalFiles); // Removes
+        for (String fileName : currentLocalFiles) {
+            fileList.put(HashingFunction.getHashFromString(fileName), new File(this.localFilesDirectory, fileName));
+        }
 
+        // Check if any files need to be deleted
         for (String fileName : previousLocalFiles) {
             // Check if local file is still there
             if (!currentLocalFiles.contains(fileName)) {
                 deleteRequest(fileName);
             }
         }
-
+        previousLocalFiles = currentLocalFiles; // Now that we have checked if files need to be deleted, we can update the previous local files
         if (infoService.getNamingServerAddress() == null) {
             logger.warn("Naming server address is still not known. Skipping file replication");
             return;
         }
-
-        // Create the file list
-        HashMap<Integer, File> newFileList = new HashMap<>();
-        for (String fileName : newFileSet) {
-            newFileList.put(HashingFunction.getHashFromString(fileName), new File(this.localFilesDirectory, fileName));
-        }
-        fileList = newFileList;
 
         // Send to naming server
         RestClient client = RestClient.builder()
@@ -166,9 +157,6 @@ public class FileService {
 
             replicatedFilesToNodes.put(hashFile, nodesThatWeReplicatedAFileTo);
         }
-
-        // Update all local files
-        previousLocalFiles = currentLocalFiles;
     }
 
     public void store(MultipartFile file, boolean isLocal) throws IOException {
@@ -186,6 +174,20 @@ public class FileService {
             e.printStackTrace();
         }
         initialStream.close();
+
+        // Check if we already had this file in the replicated folder
+        if (isLocal) {
+            File replicatedFilePath = new File(this.replicatedFilesDirectory, file.getOriginalFilename());
+            if (!replicatedFilePath.exists()) { // If the file does not exist, skip
+                return;
+            }
+
+            try {
+                replicatedFilePath.delete();
+            } catch (Exception e) {
+                logger.error("Failed to delete replicated file after receiving ownership: {}", e.getMessage());
+            }
+        }
     }
 
     public void remove(String fileName) {
@@ -222,6 +224,11 @@ public class FileService {
         for (String fileName : localList) {
             File file = new File(this.localFilesDirectory, fileName);
             transferRequest(file, this.infoService.getNodes().get(this.infoService.getPreviousID()).getSocketAddress(), true);
+            try {
+                file.delete();
+            } catch (Exception e) {
+                logger.error("Failed to delete file after transfer ship: {}", e.getMessage());
+            }
         }
 
         //
