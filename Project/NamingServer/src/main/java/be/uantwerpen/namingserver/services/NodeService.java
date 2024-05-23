@@ -2,6 +2,7 @@ package be.uantwerpen.namingserver.services;
 
 import be.uantwerpen.namingserver.models.Node;
 import be.uantwerpen.namingserver.utils.HashingFunction;
+import ch.qos.logback.core.joran.sanity.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
@@ -178,12 +179,15 @@ public class NodeService {
             return false;
         });
 
-        //update json file
+        // Update json file
         try {
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File("nodes.json"), nodes);
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        // To other nodes set the naming server
+        this.nodes.forEach((hash, node) -> this.notifyNodeOfMyAddress(node));
     }
 
 }
