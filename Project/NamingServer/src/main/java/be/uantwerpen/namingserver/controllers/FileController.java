@@ -3,11 +3,16 @@ package be.uantwerpen.namingserver.controllers;
 import be.uantwerpen.namingserver.models.Node;
 import be.uantwerpen.namingserver.services.NodeService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestClient;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 @RestController
 @RequestMapping("/files")
@@ -44,6 +49,29 @@ public class FileController {
         }
 
         return nodesToReplicateFilesOn;
+    }
+
+    //
+    @GetMapping("list/{nodeName}")
+    public Map<Integer, String> getFileList(@PathVariable String nodeName, @RequestParam(value = "replicated") boolean replicated) {
+        if (nodeName == null) {
+            return null;
+        }
+
+        System.out.println(replicated);
+
+        Node node = nodeService.getNode(nodeName);
+
+        // Do an HTTP request to the node
+        RestClient customClient = RestClient.builder()
+                .baseUrl("http://" + node.getSocketAddress() + "/files/list?replicated=" + replicated)
+                .build();
+
+        ResponseEntity<Map<Integer, String>> response = customClient.get()
+                .retrieve()
+                .toEntity(new ParameterizedTypeReference<Map<Integer, String>>() {});
+
+        return response.getBody();
     }
 
 }

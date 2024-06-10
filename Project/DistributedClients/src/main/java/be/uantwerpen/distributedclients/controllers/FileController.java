@@ -8,7 +8,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 
 @RestController
 @RequestMapping("/files")
@@ -21,8 +20,12 @@ public class FileController {
     }
 
     @GetMapping("/list")
-    public HashMap<Integer, File> getFiles() {
-        return this.fileService.getFileList();
+    public HashMap<Integer, File> getFiles(@RequestParam(value = "replicated") boolean replicated) {
+        if (replicated) {
+            return this.fileService.getReplicatedFileList();
+        }
+
+        return this.fileService.getLocalFileList();
     }
 
     // dit is wat de receiving node moet doen

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>6-Distributed Systems</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" integrity="sha512-wnea99uKIC3TJF7v4eKk4Y+lMz2Mklv18+r4na2Gn1abDRPPOeef95xTzdwGD9e6zXJBteMIhZ1+68QC5byJZw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.27/vue.global.min.js" integrity="sha512-jDpwxJN+g4BhXLdba5Z1rn2MpR9L5Wp3WVf2dJt5A0mkPHnHLZHZerpyX4JC9bM0pkCL7RmAR8FwOm02h7RKFg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.7.2/axios.min.js" integrity="sha512-JSCFHhKDilTRRXe9ak/FJ28dcpOJxzQaCd3Xg8MyF6XFjODhy/YMCM8HW0TFDckNHWUewW+kfvhin43hKtJxAw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    </head>
+    <body>
+        <noscript>This application does not work without JavaScript.</noscript>
+
+        <div class="container mx-auto mt-12">
+            <div id="app">
+                <div class="grid grid-cols-4">
+                    <div class="col-span-1">
+                        <p class="text-xl font-bold mb-3">Node list - <button class="underline text-blue-500" @click="getNodes()">Refresh</button></p>
+                        <ul class="list-disc list-inside">
+                            <li v-for="(node, index) in nodes" :key="node.name">
+                                <button type="button" @click="selectedNode = index" :class="{ 'underline': true, 'text-blue-700': selectedNode !== index, 'text-blue-900 font-bold': selectedNode === index }">
+                                    {{ node.name }}
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-span-3 relative overflow-x-auto">
+                        <p class="text-xl font-bold mb-3">Node details <slot v-if="nodes.length > 0">- <button class="underline text-blue-500" @click="getFileLists(nodes[selectedNode].name)">Refresh</button></slot></p>
+
+                        <p v-if="nodes.length === 0">There are no nodes available</p>
+                        <slot v-else>
+
+                            <div class="grid grid-cols-2 grid-rows-2">
+                                <p><span class="font-bold">Node name:</span> {{ nodes[selectedNode].name }}</p>
+                                <p><span class="font-bold">Node address:</span> {{ nodes[selectedNode].address }}</p>
+                                <p><span class="font-bold">Node leaving:</span> {{ nodes[selectedNode].leaving }}</p>
+                            </div>
+
+                            <table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 mt-4">
+                                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">
+                                        File hash
+                                    </th>
+                                    <th scope="col" class="px-6 py-3">
+                                        Local/replicated
+                                    </th>
+                                    <th scope="col" class="px-6 py-3">
+                                        File name
+                                    </th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="bg-white border-b text-gray-900" v-for="(file, hash) in localFileList" :key="hash">
+                                        <th scope="row" class="px-6 py-4">
+                                            {{ hash }}
+                                        </th>
+                                        <td class="px-6 py-4">Local</td>
+                                        <td class="px-6 py-4">
+                                            {{ file }}
+                                        </td>
+                                    </tr>
+                                    <tr class="bg-white border-b text-gray-900" v-for="(file, hash) in replicatedFileList" :key="hash">
+                                        <th scope="row" class="px-6 py-4">
+                                            {{ hash }}
+                                        </th>
+                                        <td class="px-6 py-4">Replicated</td>
+                                        <td class="px-6 py-4">
+                                            {{ file }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </slot>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script defer>
+            const { createApp, ref, onMounted, watch } = Vue;
+
+            createApp({
+                setup() {
+                    const nodes = ref([]);
+                    const selectedNode = ref(0);
+                    const localFileList = ref({});
+                    const replicatedFileList = ref({});
+
+                    async function getNodes() {
+                        const { data } = await axios.get('/nodes');
+                        if (!Array.isArray(data)) return;
+                        if (selectedNode > data.length) {
+                            selectedNode.value = 0;
+                        }
+                        nodes.value = data;
+                        await getFileLists(data[selectedNode.value].name);
+                    }
+
+                    async function getFileLists(nodeName) {
+                        const localFileListRequest = axios(`files/list/${nodeName}?replicated=false`);
+                        const replicatedFileListRequest = axios(`files/list/${nodeName}?replicated=true`);
+                        const [ local, replicated ] = await Promise.all([ localFileListRequest, replicatedFileListRequest ]);
+
+                        localFileList.value = local.data;
+                        replicatedFileList.value = replicated.data;
+                    }
+
+                    onMounted(async () => {
+                        getNodes();
+
+                        // Also fetch node file list if we have nodes
+                        if (nodes.length > 0) {
+                            await getFileLists(nodes.value[0].name);
+                        }
+                    });
+
+                    watch(selectedNode, (newNode) => {
+                        getFileLists(nodes.value[newNode].name);
+                    });
+
+                    return {
+                        nodes,
+                        selectedNode,
+                        localFileList,
+                        replicatedFileList,
+                        getFileLists,
+                        getNodes
+                    }
+                }
+            }).mount('#app')
+        </script>
+    </body>
+</html>

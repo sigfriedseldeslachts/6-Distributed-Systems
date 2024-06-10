@@ -31,7 +31,8 @@ import java.util.stream.Collectors;
 public class FileService {
     private final Logger logger = LoggerFactory.getLogger(FileService.class);
     private final InfoService infoService;
-    private HashMap<Integer, File> fileList = new HashMap<>();
+    private final HashMap<Integer, File> fileList = new HashMap<>();
+    private final HashMap<Integer, File> replicatedFileList = new HashMap<>();
     private Map<Integer, Integer> nodesToStoreFilesOn = new HashMap<>();
     private final RestTemplate restTemplate;
     private final File replicatedFilesDirectory;
@@ -106,12 +107,16 @@ public class FileService {
     @Async
     @Scheduled(fixedRate = 5000)
     public void update() {
-        logger.info("File list: {}", fileList.size());
-
         // Updates list of new local files
         Set<String> currentLocalFiles = this.getFilesInDirAsSet(this.localFilesDirectory);
         for (String fileName : currentLocalFiles) {
             fileList.put(HashingFunction.getHashFromString(fileName), new File(this.localFilesDirectory, fileName));
+        }
+
+        // Update the replicated file list. NOTE: At this moment it serves no purpose other than being used in the GUI.
+        replicatedFileList.clear();
+        for (String fileName : this.getFilesInDirAsSet(this.replicatedFilesDirectory)) {
+            replicatedFileList.put(HashingFunction.getHashFromString(fileName), new File(this.replicatedFilesDirectory, fileName));
         }
 
         // Check if any files need to be deleted
@@ -231,7 +236,6 @@ public class FileService {
             }
         }
 
-        //
         for (String fileName : replicatedList) {
             File file = new File(this.replicatedFilesDirectory, fileName);
             transferRequest(file, this.infoService.getNodes().get(this.infoService.getPreviousID()).getSocketAddress(), false);
@@ -267,7 +271,15 @@ public class FileService {
         return true;
     }
 
-    public HashMap<Integer, File> getFileList() {
+    public HashMap<Integer, File> getLocalFileList() {
         return fileList;
+    }
+
+    public HashMap<Integer, File> getReplicatedFileList() {
+        return replicatedFileList;
+    }
+
+    public boolean hasLocalFile(String originalFilename) {
+        return this.previousLocalFiles.contains(originalFilename);
     }
 }

@@ -25,5 +25,4 @@ public class NodeController {
     public void deleteNode(@PathVariable int hashcode) {
         this.nodeService.deleteNode(hashcode);
     }
-
 }
