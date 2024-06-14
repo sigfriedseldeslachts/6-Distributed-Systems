@@ -24,17 +24,22 @@
                         </ul>
                     </div>
                     <div class="col-span-3 relative overflow-x-auto">
-                        <p class="text-xl font-bold mb-3">Node details <slot v-if="nodes.length > 0">- <button class="underline text-blue-500" @click="getFileLists(nodes[selectedNode].name)">Refresh</button></slot></p>
+                        <p class="text-xl font-bold mb-3">Node details <slot v-if="nodes.length > 0">- <button class="underline text-blue-500" @click="getNodeInfo(nodes[selectedNode].name)">Refresh</button></slot></p>
 
                         <p v-if="nodes.length === 0">There are no nodes available</p>
                         <slot v-else>
+                            <div class="grid grid-cols-2 grid-rows-3">
+                                <p><span class="font-bold">Node name:</span> {{ nodeInfo?.own_node?.name }}</p>
+                                <p><span class="font-bold">Node address:</span> {{ nodeInfo?.own_node?.socketAddress }}</p>
 
-                            <div class="grid grid-cols-2 grid-rows-2">
-                                <p><span class="font-bold">Node name:</span> {{ nodes[selectedNode].name }}</p>
-                                <p><span class="font-bold">Node address:</span> {{ nodes[selectedNode].address }}</p>
-                                <p><span class="font-bold">Node leaving:</span> {{ nodes[selectedNode].leaving }}</p>
+                                <p><span class="font-bold">Node hash:</span> {{ nodeInfo?.own_hash }}</p>
+                                <p><span class="font-bold">Naming server address:</span> {{ nodeInfo?.naming_server }}</p>
+
+                                <p><span class="font-bold">Next node hash:</span> {{ nodeInfo?.next_id }}</p>
+                                <p><span class="font-bold">Node leaving:</span> {{ nodes[selectedNode]?.leaving }}</p>
+
+                                <p><span class="font-bold">Previous node hash:</span> {{ nodeInfo?.previous_id }}</p>
                             </div>
-
                             <table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 mt-4">
                                 <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                                 <tr>
@@ -50,7 +55,10 @@
                                 </tr>
                                 </thead>
                                 <tbody>
-                                    <tr class="bg-white border-b text-gray-900" v-for="(file, hash) in localFileList" :key="hash">
+                                    <tr v-if="Object.keys(nodeInfo?.local_files).length === 0 && Object.keys(nodeInfo?.replicated_files).length === 0">
+                                        <td colspan="3" class="px-6 py-4">No files available</td>
+                                    </tr>
+                                    <tr class="bg-white border-b text-gray-900" v-for="(file, hash) in nodeInfo?.local_files" :key="hash">
                                         <th scope="row" class="px-6 py-4">
                                             {{ hash }}
                                         </th>
@@ -59,7 +67,7 @@
                                             {{ file }}
                                         </td>
                                     </tr>
-                                    <tr class="bg-white border-b text-gray-900" v-for="(file, hash) in replicatedFileList" :key="hash">
+                                    <tr class="bg-white border-b text-gray-900" v-for="(file, hash) in nodeInfo?.replicated_files" :key="hash">
                                         <th scope="row" class="px-6 py-4">
                                             {{ hash }}
                                         </th>
@@ -83,8 +91,7 @@
                 setup() {
                     const nodes = ref([]);
                     const selectedNode = ref(0);
-                    const localFileList = ref({});
-                    const replicatedFileList = ref({});
+                    const nodeInfo = ref({});
 
                     async function getNodes() {
                         const { data } = await axios.get('/nodes');
@@ -93,16 +100,12 @@
                             selectedNode.value = 0;
                         }
                         nodes.value = data;
-                        await getFileLists(data[selectedNode.value].name);
+                        await getNodeInfo(data[selectedNode.value].name);
                     }
 
-                    async function getFileLists(nodeName) {
-                        const localFileListRequest = axios(`files/list/${nodeName}?replicated=false`);
-                        const replicatedFileListRequest = axios(`files/list/${nodeName}?replicated=true`);
-                        const [ local, replicated ] = await Promise.all([ localFileListRequest, replicatedFileListRequest ]);
-
-                        localFileList.value = local.data;
-                        replicatedFileList.value = replicated.data;
+                    async function getNodeInfo(nodeName) {
+                        const { data } = await axios(`nodes/${nodeName}`);
+                        nodeInfo.value = data;
                     }
 
                     onMounted(async () => {
@@ -110,20 +113,19 @@
 
                         // Also fetch node file list if we have nodes
                         if (nodes.length > 0) {
-                            await getFileLists(nodes.value[0].name);
+                            await getNodeInfo(nodes.value[0].name);
                         }
                     });
 
                     watch(selectedNode, (newNode) => {
-                        getFileLists(nodes.value[newNode].name);
+                        getNodeInfo(nodes.value[newNode].name);
                     });
 
                     return {
                         nodes,
                         selectedNode,
-                        localFileList,
-                        replicatedFileList,
-                        getFileLists,
+                        nodeInfo,
+                        getNodeInfo,
                         getNodes
                     }
                 }

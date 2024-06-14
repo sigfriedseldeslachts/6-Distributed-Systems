@@ -20,7 +20,7 @@ public class FileController {
     }
 
     @GetMapping("/list")
-    public HashMap<Integer, File> getFiles(@RequestParam(value = "replicated") boolean replicated) {
+    public HashMap<Integer, File> getFiles(@RequestParam(value = "replicated", required = false, defaultValue = "false") boolean replicated) {
         if (replicated) {
             return this.fileService.getReplicatedFileList();
         }

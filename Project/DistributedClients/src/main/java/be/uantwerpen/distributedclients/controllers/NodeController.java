@@ -1,7 +1,7 @@
 package be.uantwerpen.distributedclients.controllers;
 
+import be.uantwerpen.distributedclients.services.FileService;
 import be.uantwerpen.distributedclients.services.InfoService;
-import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -14,23 +14,27 @@ import java.util.Map;
 @RequestMapping("nodes")
 public class NodeController {
 
-    private final InfoService infoservice;
     private final Logger logger = LoggerFactory.getLogger(NodeController.class);
+    private final InfoService infoservice;
+    private final FileService fileService;
 
-    public NodeController(InfoService infoservice) {
+    public NodeController(InfoService infoservice, FileService fileService) {
         this.infoservice = infoservice;
+        this.fileService = fileService;
     }
 
     @GetMapping
-    public Object ShowDebug() {
+    public Object ShowNodeInfo() {
         HashMap<String, Object> map = new HashMap<>();
 
-        map.put("previousID", infoservice.getPreviousID());
-        map.put("nextID", infoservice.getNextID());
+        map.put("previous_id", infoservice.getPreviousID());
+        map.put("next_id", infoservice.getNextID());
         map.put("own_hash", infoservice.getSelfNode().hashCode());
         map.put("own_node", infoservice.getSelfNode());
         map.put("all_nodes", infoservice.getNodes());
         map.put("naming_server", infoservice.getNamingServerAddress());
+        map.put("local_files", fileService.getLocalFileList());
+        map.put("replicated_files", fileService.getReplicatedFileList());
 
         return map;
     }
