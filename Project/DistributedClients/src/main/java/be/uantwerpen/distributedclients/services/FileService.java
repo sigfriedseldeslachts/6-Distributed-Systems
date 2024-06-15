@@ -35,9 +35,10 @@ public class FileService {
     private final HashMap<Integer, File> replicatedFileList = new HashMap<>();
     private Map<Integer, Integer> nodesToStoreFilesOn = new HashMap<>();
     private final RestTemplate restTemplate;
-    private final File replicatedFilesDirectory;
-    private final File localFilesDirectory;
     private Set<String> previousLocalFiles = new HashSet<>();
+
+    public final File replicatedFilesDirectory;
+    public final File localFilesDirectory;
 
     private final HashMap<Integer, Set<Integer>> replicatedFilesToNodes = new HashMap<>(); // Keeps PER file a set of node hashes
 
