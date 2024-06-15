@@ -16,7 +16,11 @@ import java.util.List;
 public class SyncAgent extends Agent {
 
     private final Logger logger = LoggerFactory.getLogger(SyncAgent.class);
-    private FileService fileService;
+    private final FileService fileService;
+
+    public SyncAgent(FileService fileService) {
+        this.fileService = fileService;
+    }
 
     @Override
     protected void setup() {
