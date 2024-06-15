@@ -6,31 +6,26 @@ import jade.core.Agent;
 import jade.core.behaviours.TickerBehaviour;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 
-@Component
 public class SyncAgent extends Agent {
 
     private final Logger logger = LoggerFactory.getLogger(SyncAgent.class);
-    private final FileService fileService;
-
-    public SyncAgent(FileService fileService) {
-        this.fileService = fileService;
-    }
+    private FileService fileService;
 
     @Override
     protected void setup() {
         logger.info("SyncAgent started.");
+        this.fileService = (FileService) getArguments()[0];
         addBehaviour(new FixDuplicateBehaviour(this, 1000, fileService));
     }
 
     public static class FixDuplicateBehaviour extends TickerBehaviour {
 
-        private FileService fileService;
+        private final FileService fileService;
 
         public FixDuplicateBehaviour(Agent a, long period, FileService fileService) {
             super(a, period);

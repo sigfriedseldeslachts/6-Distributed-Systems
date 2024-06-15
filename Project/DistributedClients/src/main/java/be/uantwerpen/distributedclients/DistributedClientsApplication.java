@@ -11,6 +11,10 @@ import org.springframework.context.ApplicationContext;
 public class DistributedClientsApplication {
 
 	public static void main(String[] args) throws Exception {
+		// Did this hackery because otherwise JADE classes can't cast Spring classes.
+		// What I found is due to Spring proxying, don't understand it fully tbh
+		// More at: https://docs.spring.io/spring-framework/reference/core/aop/proxying.html
+		System.setProperty("spring.devtools.restart.enabled", "false");
 		SpringApplication.run(DistributedClientsApplication.class, args);
 	}
 }
