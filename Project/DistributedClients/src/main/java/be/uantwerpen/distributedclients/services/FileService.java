@@ -35,11 +35,18 @@ public class FileService {
     private final HashMap<Integer, File> replicatedFileList = new HashMap<>();
     private Map<Integer, Integer> nodesToStoreFilesOn = new HashMap<>();
     private final RestTemplate restTemplate;
-    private final File replicatedFilesDirectory;
-    private final File localFilesDirectory;
+    public final File replicatedFilesDirectory;
+    public final File localFilesDirectory;
     private Set<String> previousLocalFiles = new HashSet<>();
 
-    private final HashMap<Integer, Set<Integer>> replicatedFilesToNodes = new HashMap<>(); // Keeps PER file a set of node hashes
+    /**
+     * Keeps PER LOCAL file a set of hashes from the nodes where it got COPIED TO
+     */
+    private final HashMap<Integer, Set<Integer>> localFilesAndNodesWhereCopyIs = new HashMap<>();
+    /**
+     * Keeps PER COPIED file the hash from where it is LOCALLY STORED
+     */
+    private final HashMap<Integer, Integer> replicatedFilesAndLocalNodeList = new HashMap<>();
 
     public FileService(InfoService infoService, Environment env, RestClient.Builder restClientBuilder) {
         String defaultDirectory = env.getProperty("app.directory", "");
@@ -58,7 +65,10 @@ public class FileService {
     }
 
     /**
-     * de http request om file te transferen en kopieren op andere node
+     * the http request to transfer and copy a file on another node
+     * @param file file that has to be copied onto a node
+     * @param nodeAddress the node where the file has to be copied on
+     * @param shouldStoreLocally wether the file should be stored locally or in the replicated folder
      */
     public void transferRequest(File file, String nodeAddress, boolean shouldStoreLocally) {
         logger.info("Transferring file: {} to node: {}", file.getName(), nodeAddress);
@@ -70,7 +80,7 @@ public class FileService {
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
         ResponseEntity<String> responseEntity =  restTemplate.exchange(
-                "http://" + nodeAddress + "/files/replication?isLocal=" + shouldStoreLocally,
+                "http://" + nodeAddress + "/files/replication?isLocal=" + shouldStoreLocally + "?hashLocalNode=" + this.infoService.getSelfNode().getName().hashCode(),
                 HttpMethod.POST,
                 requestEntity,
                 String.class
@@ -84,7 +94,8 @@ public class FileService {
     }
 
     /**
-     * de http request om een file te verwijderen die gekopieerd staat op een andere node
+     * the http request delete a file that is copied on another node
+     * @param fileName the name of the file that is copied somewhere else but has to be deleted
      */
     public void deleteRequest(String fileName) {
         int fileHash = HashingFunction.getHashFromString(fileName);
@@ -102,6 +113,24 @@ public class FileService {
         } else {
             logger.debug("Failed to delete file. Status code: {}. File name: {}", response.getStatusCode(), fileName);
         }
+    }
+
+    public void lockRequest(String fileName, String nodeAddress, boolean needsLock) {
+        logger.info("(un)locking file: {}", fileName);
+
+        ResponseEntity<Object> response = restTemplate.exchange(
+                "http://" + nodeAddress + "/files/lock/" + fileName +"?needsLock=" + needsLock,
+                HttpMethod.PUT,
+                null,
+                Object.class
+        );
+
+        if (response.getStatusCode() == HttpStatus.OK) {
+            logger.debug("File asked to (un)lock successfully: {}", fileName);
+        } else {
+            logger.debug("Failed to ask lock. Status code: {}. File name: {}", response.getStatusCode(), fileName);
+        }
+
     }
 
     @Async
@@ -139,14 +168,15 @@ public class FileService {
                 .build();
         nodesToStoreFilesOn = client.method(HttpMethod.POST).body(new ArrayList<>(fileList.keySet())).retrieve().body(new ParameterizedTypeReference<>() {});
 
-        // Go over each files
+        // Go over each file to copy
         for (Integer hashFile : nodesToStoreFilesOn.keySet()) {
             int replicationNode = nodesToStoreFilesOn.get(hashFile); // Get the node that we should replicate to according to the naming server
+            if (infoService.getSelfNode().hashCode() == infoService.getNextID()) break; // no reason to copy the files if the node is alone
             if (replicationNode == infoService.getSelfNode().hashCode()) {
                 replicationNode = infoService.getNextID();
             }
 
-            Set<Integer> nodesThatWeReplicatedAFileTo = replicatedFilesToNodes.getOrDefault(hashFile, new HashSet<>()); // Keeps track of which file has been replicated to which node
+            Set<Integer> nodesThatWeReplicatedAFileTo = localFilesAndNodesWhereCopyIs.getOrDefault(hashFile, new HashSet<>()); // Keeps track of which file has been replicated to which node
 
             // If the replication node is already in the Set, we already replicated it and do nothing
             if (nodesThatWeReplicatedAFileTo.contains(replicationNode)) continue;
@@ -160,11 +190,18 @@ public class FileService {
 
             nodesThatWeReplicatedAFileTo.add(replicationNode); // Add the replication node to it
 
-            replicatedFilesToNodes.put(hashFile, nodesThatWeReplicatedAFileTo);
+            localFilesAndNodesWhereCopyIs.put(hashFile, nodesThatWeReplicatedAFileTo);
         }
     }
 
-    public void store(MultipartFile file, boolean isLocal) throws IOException {
+    /**
+     * stores a file to the node
+     * @param file the file that has to be sotred
+     * @param isLocal whether the file should be stored locally or in the replicated folder
+     * @param hashFromLocalNode the hash from the node where the file is locally stored on
+     * @throws IOException throws IOException
+     */
+    public void store(MultipartFile file, boolean isLocal, int hashFromLocalNode) throws IOException {
         File targetFile = new File(isLocal ? this.localFilesDirectory : this.replicatedFilesDirectory, file.getOriginalFilename());
         logger.info("Storing file: {}, Locally?: {}", targetFile.getAbsoluteFile(), isLocal);
 
@@ -179,6 +216,8 @@ public class FileService {
             e.printStackTrace();
         }
         initialStream.close();
+
+        this.replicatedFilesAndLocalNodeList.put(file.getOriginalFilename().hashCode(), hashFromLocalNode);
 
         // Check if we already had this file in the replicated folder
         if (isLocal) {
@@ -212,6 +251,19 @@ public class FileService {
             }
         } else {
             System.out.println("File " + fileName + " does not exist in the specified directory.");
+        }
+    }
+
+    public void lockFile(String filename, Boolean needsLock) {
+        HashMap<Integer, File> allFilesOnNode = new HashMap<>();
+        allFilesOnNode.putAll(getLocalFileList());
+        allFilesOnNode.putAll(getReplicatedFileList());
+        int hashFile = filename.hashCode();
+
+        for (File file : allFilesOnNode.values()) {
+            if (file.getName().hashCode() == hashFile) {
+                file.setWritable(!needsLock, false);
+            }
         }
     }
 
@@ -255,7 +307,7 @@ public class FileService {
         return Arrays.stream(dir.listFiles()).map(File::getName).collect(Collectors.toSet());
     }
 
-    private boolean createDirectory(File path) {
+    private void createDirectory(File path) {
         if (!path.exists()) {
             boolean success = path.mkdirs();
 
@@ -265,10 +317,8 @@ public class FileService {
                 logger.error("Failed to create directory: {}", path);
             }
 
-            return success;
         }
 
-        return true;
     }
 
     public HashMap<Integer, File> getLocalFileList() {
@@ -279,7 +329,11 @@ public class FileService {
         return replicatedFileList;
     }
 
-    public boolean hasLocalFile(String originalFilename) {
-        return this.previousLocalFiles.contains(originalFilename);
+    public HashMap<Integer, Set<Integer>> getLocalFilesAndNodesWhereCopyIs() {
+        return localFilesAndNodesWhereCopyIs;
+    }
+
+    public HashMap<Integer, Integer> getReplicatedFilesAndLocalNodeList() {
+        return replicatedFilesAndLocalNodeList;
     }
 }

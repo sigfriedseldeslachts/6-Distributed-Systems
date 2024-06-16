@@ -30,14 +30,21 @@ public class FileController {
 
     // dit is wat de receiving node moet doen
     @PostMapping("/replication")
-    public ResponseEntity<Object> handleFileUpload(@RequestParam("file") MultipartFile file, @RequestParam("isLocal") boolean isLocal) throws IOException {
-        fileService.store(file, isLocal);
+    public ResponseEntity<Object> handleFileUpload(@RequestParam("file") MultipartFile file, @RequestParam("isLocal") boolean isLocal,
+                                                   @RequestParam("hashLocalNode") int hashLocalNode) throws IOException {
+        fileService.store(file, isLocal, hashLocalNode);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/replication/{filename}")
     public ResponseEntity<Object> removeFile(@PathVariable String filename) {
         fileService.remove(filename);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/lock/{filename}")
+    public ResponseEntity<Object> lockFiles(@PathVariable String filename, @RequestParam("needsLock") boolean needsLock) {
+        fileService.lockFile(filename, needsLock);
         return ResponseEntity.noContent().build();
     }
 }
