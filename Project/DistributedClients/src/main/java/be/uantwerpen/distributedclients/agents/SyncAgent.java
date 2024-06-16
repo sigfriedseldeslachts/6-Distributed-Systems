@@ -41,8 +41,8 @@ public class SyncAgent extends Agent {
             List<String> replicatedFileNames = replicatedFiles.values().stream().map(File::getName).toList();
 
             for (String fileName : localFileNames) {
-                File file = new File(this.fileService.replicatedFilesDirectory, fileName);
                 if (replicatedFileNames.contains(fileName)) {
+                    File file = new File(this.fileService.replicatedFilesDirectory, fileName);
                     replicatedFiles.remove(HashingFunction.getHashFromString(fileName));
                     if(file.exists()){
                         if(file.delete()){

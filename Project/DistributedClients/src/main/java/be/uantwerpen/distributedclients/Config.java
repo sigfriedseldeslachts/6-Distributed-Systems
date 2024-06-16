@@ -16,13 +16,17 @@ import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
+import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.EnableScheduling;
+
+import java.util.Objects;
 
 @Configuration
 @EnableScheduling
 public class Config implements ApplicationContextAware {
 
     private ApplicationContext applicationContext;
+    private Environment env;
 
     @Bean
     @Scope(value = ConfigurableBeanFactory.SCOPE_SINGLETON)
@@ -35,6 +39,8 @@ public class Config implements ApplicationContextAware {
         Runtime runtime = Runtime.instance();
         Profile profile = new ProfileImpl();
         profile.setParameter(Profile.MAIN_HOST, "localhost");
+        int agentPort = Integer.parseInt(Objects.requireNonNull(applicationContext.getBean(Environment.class).getProperty("server.port")))+100;
+        profile.setParameter(Profile.LOCAL_PORT, String.valueOf(agentPort));
         AgentContainer mainContainer = runtime.createMainContainer(profile);
 
         AgentController agentController = mainContainer.createNewAgent(
