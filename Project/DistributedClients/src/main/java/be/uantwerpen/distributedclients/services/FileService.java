@@ -1,5 +1,6 @@
 package be.uantwerpen.distributedclients.services;
 
+import be.uantwerpen.distributedclients.models.Node;
 import be.uantwerpen.distributedclients.utils.HashingFunction;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -62,7 +63,7 @@ public class FileService {
      * de http request om file te transferen en kopieren op andere node
      */
     public void transferRequest(File file, String nodeAddress, boolean shouldStoreLocally) {
-        logger.info("Transferring file: {} to node: {}", file.getName(), nodeAddress);
+        logger.info("Transferring file: {} to node: {}", file.getAbsolutePath(), nodeAddress);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
@@ -89,19 +90,27 @@ public class FileService {
      */
     public void deleteRequest(String fileName) {
         int fileHash = HashingFunction.getHashFromString(fileName);
-        String nodeAddress = infoService.getNodes().get(nodesToStoreFilesOn.get(fileHash)).getSocketAddress();
+        logger.info("Deleting file: {}", fileName);
 
-        ResponseEntity<Object> response = restTemplate.exchange(
-                "http://" + nodeAddress + "/files/replication/" + fileList.get(fileHash).getName(),
-                HttpMethod.DELETE,
-                null,
-                Object.class
-        );
+        // If the file was not replicated to any node
+        if (infoService.getNodes().isEmpty()) {
+            logger.debug("No nodes to delete file from. Skipping deletion of file: {}", fileName);
+            return;
+        }
 
-        if (response.getStatusCode() == HttpStatus.OK) {
-            logger.debug("File deleted successfully: {}", fileName);
-        } else {
-            logger.debug("Failed to delete file. Status code: {}. File name: {}", response.getStatusCode(), fileName);
+        // For each node remove the file
+        // This was probably better done using multicast.
+        for (Node node : infoService.getNodes().values()) {
+            ResponseEntity<Object> response = restTemplate.exchange(
+                    "http://" + node.getSocketAddress() + "/files/replication/" + fileList.get(fileHash).getName(),
+                    HttpMethod.DELETE,
+                    null,
+                    Object.class
+            );
+
+            if (response.getStatusCode() == HttpStatus.OK) {
+                logger.debug("File {}, deleted on node {}", fileName, node.getSocketAddress());
+            }
         }
     }
 
@@ -127,6 +136,7 @@ public class FileService {
                 deleteRequest(fileName);
             }
         }
+
         previousLocalFiles = currentLocalFiles; // Now that we have checked if files need to be deleted, we can update the previous local files
         if (infoService.getNamingServerAddress() == null) {
             logger.warn("Naming server address is still not known. Skipping file replication");
@@ -212,12 +222,12 @@ public class FileService {
             // Attempt to delete the file
             // Check if the file was successfully deleted
             if (fileToRemove.delete()) {
-                System.out.println("File " + fileName + " has been successfully deleted.");
+                logger.info("File {} has been successfully deleted.", fileName);
             } else {
-                System.out.println("Failed to delete file " + fileName + ".");
+                logger.error("Failed to delete file {}.", fileName);
             }
         } else {
-            System.out.println("File " + fileName + " does not exist in the specified directory.");
+            logger.debug("File {} does not exist in the specified directory.", fileName);
         }
     }
 
