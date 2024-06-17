@@ -169,6 +169,11 @@ public class FileService {
         File targetFile = new File(isLocal ? this.localFilesDirectory : this.replicatedFilesDirectory, file.getOriginalFilename());
         logger.info("Storing file: {}, Locally?: {}", targetFile.getAbsoluteFile(), isLocal);
 
+        // If the target file is a replicated file, we should check if we already have it in local
+        if (!isLocal && this.fileList.get(HashingFunction.getHashFromString(file.getOriginalFilename())) != null) {
+            return;
+        }
+
         InputStream initialStream = file.getInputStream();
         byte[] buffer = new byte[initialStream.available()];
         initialStream.read(buffer);
